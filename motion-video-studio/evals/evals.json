@@ -1,0 +1,53 @@
+{
+  "skill_name": "motion-video-studio",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Làm giúp mình video giới thiệu app quản lý chi tiêu tên \"Ví Xanh\" dài khoảng 30 giây, khung dọc 9:16 để đăng TikTok, có voiceover tiếng Việt và phụ đề. Màu chủ đạo xanh lá. Cuối video kêu gọi tải app tại vixanh.app.",
+      "expected_output": "brief, kịch bản theo beat, storyboard, MP4 1080x1920 ~30s có âm thanh, phụ đề tiếng Việt, loudness ~-14 LUFS, CTA vixanh.app",
+      "files": [],
+      "assertions": [
+        "Final vertical MP4 delivered",
+        "Resolution is 1080x1920 (9:16)",
+        "Duration 25-35s",
+        "Has an audio track",
+        "Loudness within -14±2 LUFS",
+        "A script document with beats/VO exists",
+        "CTA vixanh.app appears in the video source",
+        "Vietnamese captions/subtitles implemented",
+        "No black stretches ≥0.25s"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I need a 45-60 second 16:9 explainer video that explains how a blockchain works (blocks, hashes, chain linking, tamper-evidence). Include at least one 3D scene with cubes linking together into a chain. English on-screen text; voice-over optional.",
+      "expected_output": "script + storyboard, 1920x1080 MP4 45-60s, a Three.js/R3F scene of linked cubes, readable text, no black/flicker frames",
+      "files": [],
+      "assertions": [
+        "Final MP4 delivered",
+        "Resolution is 1920x1080",
+        "Duration 45-60s",
+        "Uses Three.js / R3F for a 3D scene",
+        "Script document exists",
+        "Covers blocks, hashes, chain linking, tamper-evidence",
+        "No black stretches ≥0.25s (3D flicker check)"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Đây là logo SVG quán cà phê của tôi (logo.svg). Animate nó thành intro 5 giây có hiệu ứng âm thanh, xuất cả bản 16:9 và bản vuông 1:1 cho Instagram.",
+      "expected_output": "SVG optimized, draw-on/reveal animation of logo parts, SFX synced to the reveal, two MP4s (1920x1080 and 1080x1080) ~5s",
+      "files": [
+        "evals/logo.svg"
+      ],
+      "assertions": [
+        "16:9 MP4 (1920x1080) delivered",
+        "1:1 square MP4 delivered",
+        "Both versions are 4-6s long",
+        "Both versions have audio (SFX)",
+        "SVG was optimized with SVGO",
+        "Animation targets individual logo parts (ring/leaf/vein or per-path)"
+      ]
+    }
+  ]
+}
