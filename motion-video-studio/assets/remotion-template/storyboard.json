@@ -1,0 +1,74 @@
+{
+  "meta": {
+    "title": "Demo — Motion Video Studio",
+    "fps": 30,
+    "aspect": "16:9",
+    "language": "vi"
+  },
+  "theme": {
+    "colors": {
+      "bg": "#0B1020",
+      "surface": "#161D3A",
+      "primary": "#6C8CFF",
+      "accent": "#FFB547",
+      "text": "#F5F7FF",
+      "muted": "#9AA3C7"
+    }
+  },
+  "audio": {
+    "music": { "src": "audio/sfx/music-bed.wav", "volume": 0.5, "duckTo": 0.15 }
+  },
+  "scenes": [
+    {
+      "id": "hook",
+      "beat": "hook",
+      "component": "TitleCard",
+      "duration": 3,
+      "props": { "kicker": "MOTION VIDEO STUDIO", "title": "Từ kịch bản đến video", "subtitle": "trong một quy trình" },
+      "vo": { "text": "Từ kịch bản đến video, trong một quy trình." },
+      "sfx": [{ "src": "audio/sfx/whoosh.wav", "at": 0.1, "volume": 0.5 }]
+    },
+    {
+      "id": "steps",
+      "beat": "solution",
+      "component": "BulletList",
+      "duration": 4,
+      "transition": { "type": "slide", "duration": 0.5, "direction": "from-right" },
+      "props": { "title": "Quy trình", "items": ["Brief & kịch bản", "Storyboard", "Thiết kế & asset", "Animation & âm thanh", "Render & xuất bản"] },
+      "vo": { "text": "Brief, storyboard, thiết kế, animation, rồi render." }
+    },
+    {
+      "id": "stat",
+      "beat": "proof",
+      "component": "StatCounter",
+      "duration": 3,
+      "transition": { "type": "wipe", "duration": 0.5, "direction": "from-left" },
+      "props": { "value": 20, "suffix": "+", "label": "công cụ mã nguồn mở được kết nối" }
+    },
+    {
+      "id": "gsap-demo",
+      "beat": "proof",
+      "component": "GsapShapes",
+      "duration": 3,
+      "transition": { "type": "fade", "duration": 0.4 },
+      "props": { "caption": "GSAP timeline, điều khiển theo frame" }
+    },
+    {
+      "id": "anime-demo",
+      "beat": "proof",
+      "component": "AnimeLineDraw",
+      "duration": 3,
+      "transition": { "type": "fade", "duration": 0.4 },
+      "props": { "caption": "Anime.js vẽ đường SVG" }
+    },
+    {
+      "id": "cta",
+      "beat": "cta",
+      "component": "EndCard",
+      "duration": 3,
+      "transition": { "type": "fade", "duration": 0.5 },
+      "props": { "title": "Bắt đầu ngay", "cta": "npx skills add motion-video-studio" },
+      "sfx": [{ "src": "audio/sfx/ding.wav", "at": 0.4, "volume": 0.4 }]
+    }
+  ]
+}

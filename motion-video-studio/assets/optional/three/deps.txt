@@ -1,0 +1,7 @@
+@remotion/three@4.0.537
+three@0.186.1
+@types/three@0.186.0
+@react-three/fiber@9.8.2
+@react-three/drei@10.7.9
+@react-three/postprocessing@3.2.1
+postprocessing@6.39.5
