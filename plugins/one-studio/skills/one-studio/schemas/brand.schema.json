@@ -1,0 +1,349 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "one-studio/brand.schema.json",
+  "title": "one-studio brand kit",
+  "description": "Shared design tokens for every scene of a video or series. Bump `version` on any change: every scene hash includes it.",
+  "type": "object",
+  "required": [
+    "name",
+    "version",
+    "colors",
+    "typography",
+    "motion"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "colors": {
+      "type": "object",
+      "required": [
+        "bg",
+        "fg",
+        "primary",
+        "accent"
+      ],
+      "additionalProperties": {
+        "$ref": "#/$defs/color"
+      },
+      "properties": {
+        "bg": {
+          "$ref": "#/$defs/color"
+        },
+        "fg": {
+          "$ref": "#/$defs/color"
+        },
+        "primary": {
+          "$ref": "#/$defs/color"
+        },
+        "secondary": {
+          "$ref": "#/$defs/color"
+        },
+        "accent": {
+          "$ref": "#/$defs/color"
+        },
+        "muted": {
+          "$ref": "#/$defs/color"
+        }
+      }
+    },
+    "typography": {
+      "type": "object",
+      "required": [
+        "heading",
+        "body"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "heading": {
+          "$ref": "#/$defs/font"
+        },
+        "body": {
+          "$ref": "#/$defs/font"
+        },
+        "mono": {
+          "$ref": "#/$defs/font"
+        },
+        "scale": {
+          "description": "Font sizes in px at 1080p height; scaled for other sizes.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "logo": {
+      "type": "object",
+      "required": [
+        "svg"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "svg": {
+          "type": "string",
+          "description": "Path relative to brand.json; optimised with SVGO."
+        },
+        "mono_svg": {
+          "type": "string"
+        },
+        "min_height": {
+          "type": "number",
+          "minimum": 1
+        }
+      }
+    },
+    "grid": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "unit": {
+          "type": "number",
+          "minimum": 1
+        },
+        "margin": {
+          "type": "number",
+          "minimum": 0
+        },
+        "columns": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "safe_area": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.5,
+          "description": "Fraction of frame kept clear at each edge."
+        }
+      }
+    },
+    "motion": {
+      "type": "object",
+      "required": [
+        "ease",
+        "duration"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "ease": {
+          "type": "object",
+          "required": [
+            "in",
+            "out",
+            "inOut"
+          ],
+          "additionalProperties": {
+            "type": "string"
+          },
+          "properties": {
+            "in": {
+              "type": "string"
+            },
+            "out": {
+              "type": "string"
+            },
+            "inOut": {
+              "type": "string"
+            }
+          }
+        },
+        "duration": {
+          "type": "object",
+          "required": [
+            "fast",
+            "base",
+            "slow"
+          ],
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          },
+          "properties": {
+            "fast": {
+              "type": "number",
+              "minimum": 0
+            },
+            "base": {
+              "type": "number",
+              "minimum": 0
+            },
+            "slow": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        },
+        "stagger": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "transitions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "default": {
+          "$ref": "#/$defs/transitionKind"
+        },
+        "duration": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "captions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "mode": {
+          "enum": [
+            "burn",
+            "mux",
+            "sidecar"
+          ]
+        },
+        "font": {
+          "type": "string"
+        },
+        "size": {
+          "type": "number",
+          "minimum": 1
+        },
+        "color": {
+          "$ref": "#/$defs/color"
+        },
+        "background": {
+          "type": "string"
+        },
+        "position": {
+          "enum": [
+            "bottom",
+            "top",
+            "middle"
+          ]
+        },
+        "max_chars": {
+          "type": "integer",
+          "minimum": 10
+        }
+      }
+    },
+    "lower_third": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "template": {
+          "type": "string"
+        },
+        "duration": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "intro": {
+      "$ref": "#/$defs/bumper"
+    },
+    "outro": {
+      "$ref": "#/$defs/bumper"
+    },
+    "voice": {
+      "description": "Default voices per language; key = BCP-47 language or 'default'.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "voice"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "voice": {
+            "type": "string"
+          },
+          "speed": {
+            "type": "number",
+            "minimum": 0.25,
+            "maximum": 4
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "color": {
+      "type": "string",
+      "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+    },
+    "font": {
+      "type": "object",
+      "required": [
+        "family"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "weight": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 900
+        },
+        "src": {
+          "type": "string",
+          "description": "Local font file relative to brand.json (fonts are bundled, never fetched at render)."
+        },
+        "fallback": {
+          "type": "string"
+        },
+        "fontsource": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+@\\d+\\.\\d+\\.\\d+$",
+          "description": "Pinned @fontsource package (e.g. inter@5.2.8); latin, latin-ext and vietnamese subsets are bundled."
+        }
+      }
+    },
+    "transitionKind": {
+      "enum": [
+        "cut",
+        "fade",
+        "slide-left",
+        "slide-up",
+        "wipe",
+        "zoom",
+        "blur"
+      ]
+    },
+    "bumper": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "template": {
+          "type": "string"
+        },
+        "duration": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

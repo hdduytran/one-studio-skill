@@ -1,0 +1,466 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "one-studio/studio.schema.json",
+  "title": "one-studio project manifest",
+  "description": "Single source of truth for gate progress, scene cache state and render settings. Written by the scripts; edit by hand only when told to.",
+  "type": "object",
+  "required": [
+    "version",
+    "meta",
+    "brand",
+    "format",
+    "engine",
+    "gates",
+    "scenes",
+    "audio",
+    "render"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "const": 1
+    },
+    "meta": {
+      "type": "object",
+      "required": [
+        "name",
+        "language",
+        "created"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "title": {
+          "type": "string"
+        },
+        "language": {
+          "type": "string",
+          "minLength": 2,
+          "description": "VO / caption language, e.g. vi, en."
+        },
+        "series": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "episode": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "created": {
+          "type": "string"
+        }
+      }
+    },
+    "brand": {
+      "type": "object",
+      "required": [
+        "ref"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "ref": {
+          "type": "string",
+          "description": "Path to brand.json relative to studio.json (series brand lives outside the project)."
+        },
+        "version": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Brand version last used for hashing; a mismatch means scenes are stale."
+        }
+      }
+    },
+    "format": {
+      "type": "object",
+      "required": [
+        "aspect",
+        "width",
+        "height",
+        "fps"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "aspect": {
+          "enum": [
+            "16:9",
+            "9:16",
+            "1:1",
+            "4:5"
+          ]
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 16
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 16
+        },
+        "fps": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 120
+        },
+        "target_duration": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "exports": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "16:9",
+              "9:16",
+              "1:1",
+              "4:5"
+            ]
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "engine": {
+      "type": "object",
+      "required": [
+        "default",
+        "dimension"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "default": {
+          "enum": [
+            "hyperframes",
+            "remotion"
+          ]
+        },
+        "dimension": {
+          "enum": [
+            "2d",
+            "3d",
+            "mixed"
+          ]
+        },
+        "versions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Pinned engine versions; part of every scene hash."
+        }
+      }
+    },
+    "services": {
+      "description": "External services the user allowed at gate 0. Anything not true must be asked before use.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "boolean"
+      }
+    },
+    "gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "setup": {
+          "$ref": "#/$defs/gate"
+        },
+        "brief": {
+          "$ref": "#/$defs/gate"
+        },
+        "script": {
+          "$ref": "#/$defs/gate"
+        },
+        "storyboard": {
+          "$ref": "#/$defs/gate"
+        },
+        "estimate": {
+          "$ref": "#/$defs/gate"
+        },
+        "keyframes": {
+          "$ref": "#/$defs/gate"
+        },
+        "build": {
+          "$ref": "#/$defs/gate"
+        },
+        "audio": {
+          "$ref": "#/$defs/gate"
+        },
+        "preview": {
+          "$ref": "#/$defs/gate"
+        },
+        "render": {
+          "$ref": "#/$defs/gate"
+        },
+        "publish": {
+          "$ref": "#/$defs/gate"
+        }
+      }
+    },
+    "scenes": {
+      "description": "Per-scene build state, keyed by storyboard scene id order.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/sceneState"
+      }
+    },
+    "audio": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tts": {
+          "type": "object",
+          "description": "Key = language code or 'default'. vi → ZeroTTS, default → OmniVoice. API keys come from env, never stored here.",
+          "additionalProperties": {
+            "$ref": "#/$defs/ttsEndpoint"
+          }
+        },
+        "music": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sfx": {
+          "type": "boolean"
+        },
+        "loudness": {
+          "type": "number",
+          "maximum": 0
+        },
+        "sentence_pause": {
+          "type": "number",
+          "minimum": 0
+        },
+        "scene_padding": {
+          "type": "number",
+          "minimum": 0
+        },
+        "lead_in": {
+          "type": "number",
+          "minimum": 0
+        },
+        "trim": {
+          "type": "boolean",
+          "description": "Trim leading/trailing silence of each TTS sentence."
+        }
+      }
+    },
+    "render": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "quality": {
+          "enum": [
+            "draft",
+            "looks",
+            "delivery"
+          ]
+        },
+        "preview_height": {
+          "type": "integer",
+          "minimum": 144
+        },
+        "out_dir": {
+          "type": "string"
+        },
+        "codec": {
+          "const": "h264"
+        },
+        "pix_fmt": {
+          "const": "yuv420p"
+        },
+        "crf": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 51
+        }
+      }
+    },
+    "credit": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "warn_scenes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "warn_types": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "outputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "preview": {
+          "$ref": "#/$defs/output"
+        },
+        "final": {
+          "$ref": "#/$defs/output"
+        },
+        "publish": {
+          "$ref": "#/$defs/output"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "done": {
+          "type": "boolean"
+        },
+        "at": {
+          "type": "string"
+        },
+        "hash": {
+          "type": "string",
+          "description": "sha256 of the gate's input file when approved; a change re-opens the gate."
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "sceneState": {
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "hash": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "approved_hash": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Hash the user approved at keyframe review."
+        },
+        "clip": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "duration": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "status": {
+          "enum": [
+            "planned",
+            "built",
+            "reviewed",
+            "rendered"
+          ]
+        },
+        "preview_clip": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fit_duration": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Scene length stretched to fit its VO (written by build-audio)."
+        }
+      }
+    },
+    "ttsEndpoint": {
+      "type": "object",
+      "required": [
+        "base_url",
+        "model",
+        "voice"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "base_url": {
+          "type": "string",
+          "pattern": "^https?://"
+        },
+        "model": {
+          "type": "string"
+        },
+        "voice": {
+          "type": "string"
+        },
+        "format": {
+          "enum": [
+            "wav",
+            "mp3",
+            "flac",
+            "opus"
+          ]
+        },
+        "speed": {
+          "type": "number",
+          "minimum": 0.25,
+          "maximum": 4
+        },
+        "key_env": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]*$"
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "required": [
+        "path",
+        "hash"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "hash": {
+          "type": "string"
+        },
+        "at": {
+          "type": "string"
+        },
+        "duration": {
+          "type": "number"
+        }
+      }
+    }
+  }
+}

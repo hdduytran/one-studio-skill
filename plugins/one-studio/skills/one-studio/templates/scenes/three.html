@@ -1,0 +1,44 @@
+  <canvas id="gl" width="{{width}}" height="{{height}}" style="position:absolute; inset:0; width:100%; height:100%"></canvas>
+  <div class="os-frame clip" data-start="0" data-duration="{{duration}}" data-track-index="0">
+    <h2 class="os-h2">{{headline}}</h2>
+  </div>
+</div>
+<script type="module">
+  // three.js inside HyperFrames: render only from scene time t (S.drive). No clock, no animation loop.
+  import * as THREE from "../assets/vendor/three.module.min.js";
+  const C = window.BRAND.colors;
+  const canvas = document.getElementById("gl");
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(1);
+  renderer.setSize(canvas.width, canvas.height, false);
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(C.bg);
+  const camera = new THREE.PerspectiveCamera(35, canvas.width / canvas.height, 0.1, 100);
+  camera.position.set(0, 1.2, 6);
+  camera.lookAt(0, 0, 0);
+  scene.add(new THREE.HemisphereLight(0xffffff, new THREE.Color(C.bg), 1.2));
+  const key = new THREE.DirectionalLight(0xffffff, 2.2);
+  key.position.set(3, 4, 5);
+  scene.add(key);
+
+  const subject = new THREE.Mesh(new THREE.IcosahedronGeometry(1.2, 1), new THREE.MeshStandardMaterial({ color: C.primary, roughness: 0.35, metalness: 0.2, flatShading: true }));
+  scene.add(subject);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(2, 0.03, 16, 120), new THREE.MeshBasicMaterial({ color: C.accent }));
+  ring.rotation.x = Math.PI / 2.4;
+  scene.add(ring);
+
+  function render(t) {
+    subject.rotation.set(t * 0.4, t * 0.7, 0);
+    ring.rotation.z = t * 0.3;
+    camera.position.x = Math.sin(t * 0.25) * 1.5;
+    camera.lookAt(0, 0, 0);
+    renderer.render(scene, camera);
+  }
+
+  const S = OS.scene("{{id}}");
+  S.drive(render);
+  S.enter(".os-h2", { at: 0.4 });
+  S.done();
+</script>
+</body>
+</html>

@@ -1,0 +1,185 @@
+#!/usr/bin/env node
+// Assemble the video: concat scene clips (stream copy, storyboard order), mix VO + music (ducked),
+// two-pass loudnorm to the target LUFS, captions (burn / mux / sidecar per brand.captions.mode).
+//   node concat-and-mix.mjs <project-dir> [--preview] [--no-captions]
+// Output: out/<name>.mp4 (or out/<name>-preview.mp4) + out/<name>.srt; recorded in studio.json → outputs.
+import { copyFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { join, relative } from "node:path";
+import { isMain, loadProject, now, parseArgs } from "./lib/project.mjs";
+import { audioHash } from "./lib/hash.mjs";
+import { gateInputHash, outputPath, readAudioManifest } from "./lib/gates.mjs";
+import { checkClips, concatCopy, encodeSettings, normalize, probe, run } from "./lib/ffmpeg.mjs";
+import { planRender } from "./render-changed-scenes.mjs";
+
+// "#rrggbb" / "rgba(r,g,b,a)" → ASS &HAABBGGRR
+export function assColor(css, fallback = "&H00FFFFFF") {
+  if (!css) return fallback;
+  let r, g, b, a = 1;
+  const hex = /^#([0-9a-f]{6})([0-9a-f]{2})?$/i.exec(css.trim());
+  const rgba = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)$/i.exec(css.trim());
+  if (hex) [r, g, b, a] = [parseInt(hex[1].slice(0, 2), 16), parseInt(hex[1].slice(2, 4), 16), parseInt(hex[1].slice(4, 6), 16), hex[2] ? parseInt(hex[2], 16) / 255 : 1];
+  else if (rgba) [r, g, b, a] = [+rgba[1], +rgba[2], +rgba[3], rgba[4] == null ? 1 : +rgba[4]];
+  else return fallback;
+  const h = (n) => Math.round(n).toString(16).padStart(2, "0").toUpperCase();
+  return `&H${h((1 - a) * 255)}${h(b)}${h(g)}${h(r)}`;
+}
+
+// libass styles for .srt live in a 384×288 script space scaled to the video height; brand sizes are px
+// at 1080 on the short side, so portrait videos keep the same on-screen size relative to the width.
+export function captionStyle(brand, width = 1920, height = 1080) {
+  const c = brand?.captions ?? {};
+  // Phones show portrait video full-screen: captions a bit larger there.
+  const k = (288 / height) * (Math.min(width, height) / 1080) * (height > width * 1.2 ? 1.35 : 1);
+  const size = Math.round((c.size ?? 44) * k * 10) / 10;
+  const margin = Math.round(288 * 0.06);
+  const align = { bottom: 2, middle: 5, top: 8 }[c.position ?? "bottom"];
+  return [
+    `FontName=${(c.font ?? brand?.typography?.body?.family ?? "Sans").replace(/[,']/g, "")}`,
+    `FontSize=${size}`,
+    `PrimaryColour=${assColor(c.color, "&H00FFFFFF")}`,
+    `OutlineColour=${assColor(c.background, "&H73000000")}`,
+    `BackColour=${assColor(c.background, "&H73000000")}`,
+    "BorderStyle=3",
+    `Outline=${Math.max(1, Math.round(size * 0.35))}`,
+    "Shadow=0",
+    `Alignment=${align}`,
+    `MarginV=${margin}`,
+    `Bold=${(brand?.typography?.body?.weight ?? 400) >= 600 ? 1 : 0}`,
+  ].join(",");
+}
+
+const filterPath = (p) => p.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'");
+
+function measureLoudness(file) {
+  const r = run("ffmpeg", ["-hide_banner", "-nostats", "-i", file, "-af", "loudnorm=I=-14:TP=-1.5:LRA=11:print_format=json", "-f", "null", "-"]);
+  const json = /\{[\s\S]*?\}/.exec(r.stderr.slice(r.stderr.lastIndexOf("[Parsed_loudnorm")));
+  return json ? JSON.parse(json[0]) : null;
+}
+
+export function integratedLufs(file) {
+  const r = run("ffmpeg", ["-hide_banner", "-nostats", "-i", file, "-map", "0:a:0", "-af", "ebur128=framelog=quiet", "-f", "null", "-"]);
+  const m = /Integrated loudness:\s*I:\s*(-?[\d.]+) LUFS/.exec(r.stderr);
+  return m ? Number(m[1]) : null;
+}
+
+// Mixed, loudness-normalised stereo WAV at 48 kHz, exactly `dur` seconds long.
+function buildMix(project, manifest, dur, tmp) {
+  const target = project.studio.audio?.loudness ?? -14;
+  const music = project.studio.audio?.music ? join(project.root, project.studio.audio.music) : null;
+  const vo = manifest?.vo ? join(project.root, manifest.vo) : null;
+  const raw = join(tmp, "mix-raw.wav");
+  const fmt = "aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo";
+  if (vo && music) {
+    run("ffmpeg", ["-y", "-v", "error", "-i", vo, "-stream_loop", "-1", "-i", music, "-filter_complex",
+      `[0:a]${fmt},apad[vo];[1:a]${fmt},volume=0.5,afade=t=out:st=${Math.max(0, dur - 2)}:d=2[m];[vo]asplit=2[vo1][key];[m][key]sidechaincompress=threshold=0.03:ratio=10:attack=15:release=350[duck];[vo1][duck]amix=inputs=2:normalize=0:duration=longest[mix]`,
+      "-map", "[mix]", "-t", String(dur), "-ar", "48000", raw]);
+  } else if (vo) {
+    run("ffmpeg", ["-y", "-v", "error", "-i", vo, "-af", `${fmt},apad`, "-t", String(dur), "-ar", "48000", raw]);
+  } else if (music) {
+    run("ffmpeg", ["-y", "-v", "error", "-stream_loop", "-1", "-i", music, "-af", `${fmt},afade=t=out:st=${Math.max(0, dur - 2)}:d=2`, "-t", String(dur), "-ar", "48000", raw]);
+  } else {
+    run("ffmpeg", ["-y", "-v", "error", "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-t", String(dur), raw]);
+    return { file: raw, lufs: null, silent: true };
+  }
+  const m = measureLoudness(raw);
+  const out = join(tmp, "mix.wav");
+  if (!m || !Number.isFinite(Number(m.input_i)) || Number(m.input_i) < -70) {
+    copyFileSync(raw, out);
+    return { file: out, lufs: null, silent: true };
+  }
+  run("ffmpeg", ["-y", "-v", "error", "-i", raw, "-af",
+    `loudnorm=I=${target}:TP=-1.5:LRA=11:measured_I=${m.input_i}:measured_TP=${m.input_tp}:measured_LRA=${m.input_lra}:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true,aresample=48000`,
+    "-t", String(dur), out]);
+  return { file: out, lufs: null, silent: false };
+}
+
+// Concat clips (already canonical), mix audio, captions → outPath. Shared by concat-and-mix and publish.
+export function assemble(project, clips, settings, outPath, { captions = true, log = () => {} } = {}) {
+  const problems = checkClips(clips, settings);
+  if (problems.length) {
+    log(`QA: re-normalising mismatched clips:\n  ${problems.join("\n  ")}`);
+    for (const c of new Set(problems.map((p) => p.split(":")[0]))) {
+      const tmp = `${c}.renorm.mp4`;
+      normalize(c, tmp, settings);
+      copyFileSync(tmp, c);
+      rmSync(tmp);
+    }
+    const again = checkClips(clips, settings);
+    if (again.length) throw new Error(`Clips still differ after normalising:\n  ${again.join("\n  ")}`);
+  }
+
+  const tmp = join(project.root, ".one-studio", `tmp-mix-${process.pid}`);
+  rmSync(tmp, { recursive: true, force: true });
+  mkdirSync(tmp, { recursive: true });
+  try {
+    const video = concatCopy(clips, join(tmp, "video.mp4"));
+    const dur = probe(video).duration;
+
+    const manifest = readAudioManifest(project);
+    const hasLines = (project.storyboard?.scenes ?? []).some((s) => s.lines?.length);
+    if (manifest && manifest.hash !== audioHash(project)) log("⚠ audio/manifest.json is out of date (run build-audio.mjs); using it anyway");
+    if (!manifest && hasLines) log("⚠ no voice-over yet (build-audio.mjs not run): output has music/silence only");
+    if (manifest?.duration && Math.abs(manifest.duration - dur) > 0.15) log(`⚠ audio timeline ${manifest.duration}s vs video ${dur.toFixed(2)}s: re-run build-audio.mjs after changing scenes`);
+    const mix = buildMix(project, manifest, dur, tmp);
+
+    mkdirSync(join(outPath, ".."), { recursive: true });
+    const srt = manifest?.captions ? join(project.root, manifest.captions) : null;
+    const cap = project.brand?.captions ?? {};
+    const capMode = captions && srt && existsSync(srt) && cap.enabled !== false ? cap.mode ?? "burn" : "none";
+    const args = ["-y", "-v", "error", "-i", video, "-i", mix.file];
+    if (capMode === "burn") {
+      const fonts = join(project.root, "assets", "fonts");
+      const style = captionStyle(project.brand, settings.width, settings.height);
+      const vf = `subtitles='${filterPath(srt)}'${existsSync(fonts) ? `:fontsdir='${filterPath(fonts)}'` : ""}:force_style='${style}'`;
+      args.push("-map", "0:v", "-map", "1:a", "-vf", vf, "-c:v", "libx264", "-profile:v", "high", "-preset", settings.preset, "-crf", String(settings.crf), "-pix_fmt", "yuv420p", "-g", String(settings.fps * 2));
+    } else if (capMode === "mux") {
+      args.push("-i", srt, "-map", "0:v", "-map", "1:a", "-map", "2:s", "-c:v", "copy", "-c:s", "mov_text", "-metadata:s:s:0", `language=${project.studio.meta.language}`);
+    } else {
+      args.push("-map", "0:v", "-map", "1:a", "-c:v", "copy");
+    }
+    args.push("-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-shortest", "-movflags", "+faststart", `${outPath}.part.mp4`);
+    run("ffmpeg", args);
+    copyFileSync(`${outPath}.part.mp4`, outPath);
+    rmSync(`${outPath}.part.mp4`);
+    if (srt && existsSync(srt)) copyFileSync(srt, outPath.replace(/\.mp4$/, ".srt"));
+    const final = probe(outPath);
+    return { out: outPath, duration: final.duration, video: final.video, audio: final.audio, lufs: mix.silent ? null : integratedLufs(outPath), captions: capMode, audioHash: manifest?.hash ?? null };
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+export function concatAndMix(dir, { mode = "final", captions = true, log = () => {} } = {}) {
+  const project = loadProject(dir);
+  const plan = planRender(project, { mode });
+  const missing = plan.filter((p) => p.action !== "cached");
+  if (missing.length) {
+    throw new Error(`Scenes without a ${mode} clip for their current version: ${missing.map((p) => p.scene.id).join(", ")}.\nRun render-changed-scenes.mjs${mode === "preview" ? " --preview" : ""} first.`);
+  }
+  const settings = encodeSettings(project.studio, mode);
+  const clips = plan.map((p) => join(project.root, p.clip));
+  const r = assemble(project, clips, settings, outputPath(project, mode), { captions, log });
+  project.studio.outputs ??= {};
+  project.studio.outputs[mode] = { path: relative(project.root, r.out), hash: gateInputHash(project, { id: mode === "preview" ? "preview" : "render" }), at: now(), duration: Math.round(r.duration * 1000) / 1000 };
+  if (mode === "final" && project.brand) project.studio.brand.version = project.brand.version;
+  project.save();
+  writeFileSync(r.out.replace(/\.mp4$/, ".json"), JSON.stringify({ scenes: plan.map((p) => ({ id: p.scene.id, hash: p.hash, clip: p.clip })), audio: r.audioHash, captions: r.captions, lufs: r.lufs }, null, 2) + "\n");
+  return { ...r, scenes: plan.length };
+}
+
+if (isMain(import.meta.url)) {
+  try {
+    const args = parseArgs(process.argv.slice(2), { flags: ["preview", "no-captions", "help"] });
+    const dir = args._[0];
+    if (args.help || !dir) {
+      console.log("usage: concat-and-mix.mjs <project-dir> [--preview] [--no-captions]");
+      process.exit(dir ? 0 : 1);
+    }
+    const r = concatAndMix(dir, { mode: args.preview ? "preview" : "final", captions: !args["no-captions"], log: console.log });
+    console.log(`✓ ${r.out}`);
+    console.log(`  ${r.scenes} scenes, ${r.duration.toFixed(2)}s, ${r.video.width}x${r.video.height}@${r.video.fps}, captions: ${r.captions}${r.lufs != null ? `, loudness ${r.lufs} LUFS` : ""}`);
+  } catch (err) {
+    console.error(err.message);
+    process.exit(1);
+  }
+}

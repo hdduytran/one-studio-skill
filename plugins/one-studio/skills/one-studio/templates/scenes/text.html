@@ -1,0 +1,13 @@
+  <div class="os-frame os-center clip" data-start="0" data-duration="{{duration}}" data-track-index="0">
+    <h1 class="os-display">{{headline}}</h1>
+    <p class="os-h2 os-muted">{{subline}}</p>
+  </div>
+</div>
+<script>
+  const S = OS.scene("{{id}}");
+  S.words(".os-display", { at: 0.3 });
+  S.enter(".os-h2", { at: 1.2, kind: "up" });
+  S.done();
+</script>
+</body>
+</html>

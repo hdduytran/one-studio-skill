@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1920, height=1080" />
+<!-- one-studio scene s02 (diagram). Edit content and the timeline only; styles come from brand tokens. -->
+<link rel="stylesheet" href="../assets/brand.css" />
+<link rel="stylesheet" href="../assets/os.css" />
+<script src="../assets/vendor/gsap.min.js"></script>
+<script src="../assets/brand.js"></script>
+<script src="../assets/os.js"></script>
+</head>
+<body>
+<div id="root" class="os-scene" data-composition-id="s02" data-start="0" data-duration="10" data-width="1920" data-height="1080"
+     data-transition-in="slide-left" data-transition-out="slide-left" data-transition-duration="0.5"
+     style="--w: 1920px; --h: 1080px">
+  <div class="os-frame clip" data-start="0" data-duration="10" data-track-index="0">
+    <h2 class="os-h2">Điện thoại chỉ <span class="os-accent">nghe</span></h2>
+    <div class="os-diagram">
+      <svg viewBox="0 0 1600 640" xmlns="http://www.w3.org/2000/svg">
+        <g class="sats">
+          <g class="sat" transform="translate(220 90)"><rect class="fill-primary" x="-60" y="-14" width="40" height="28" rx="4"/><rect class="fill-accent" x="-18" y="-22" width="36" height="44" rx="8"/><rect class="fill-primary" x="20" y="-14" width="40" height="28" rx="4"/></g>
+          <g class="sat" transform="translate(600 40)"><rect class="fill-primary" x="-60" y="-14" width="40" height="28" rx="4"/><rect class="fill-accent" x="-18" y="-22" width="36" height="44" rx="8"/><rect class="fill-primary" x="20" y="-14" width="40" height="28" rx="4"/></g>
+          <g class="sat" transform="translate(1000 40)"><rect class="fill-primary" x="-60" y="-14" width="40" height="28" rx="4"/><rect class="fill-accent" x="-18" y="-22" width="36" height="44" rx="8"/><rect class="fill-primary" x="20" y="-14" width="40" height="28" rx="4"/></g>
+          <g class="sat" transform="translate(1380 90)"><rect class="fill-primary" x="-60" y="-14" width="40" height="28" rx="4"/><rect class="fill-accent" x="-18" y="-22" width="36" height="44" rx="8"/><rect class="fill-primary" x="20" y="-14" width="40" height="28" rx="4"/></g>
+        </g>
+        <g class="signals">
+          <path class="stroke-primary sig" d="M220 120 L 790 500" />
+          <path class="stroke-primary sig" d="M600 70 L 795 500" />
+          <path class="stroke-primary sig" d="M1000 70 L 805 500" />
+          <path class="stroke-primary sig" d="M1380 120 L 810 500" />
+        </g>
+        <rect class="stroke phone" x="740" y="500" width="120" height="130" rx="18" />
+        <text class="label clock" x="800" y="585" text-anchor="middle" font-size="40">⏱</text>
+      </svg>
+    </div>
+  </div>
+</div>
+<script>
+  const S = OS.scene("s02");
+  S.enter(".os-h2", { at: 0.2 });
+  S.enter(".sat", { at: 0.5, kind: "pop", stagger: 0.2 });
+  S.draw(".phone", { at: 1.2 });
+  S.draw(".sig", { at: 2.2, stagger: 0.4, dur: 1.4 });
+  S.enter(".clock", { at: 5.2, kind: "pop" });
+  S.done();
+</script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+  <div class="os-frame os-center clip" data-start="0" data-duration="{{duration}}" data-track-index="0">
+    <canvas id="cv" width="{{width}}" height="{{height}}" style="position:absolute; inset:0; width:100%; height:100%"></canvas>
+    <h2 class="os-h2" style="position:relative">{{headline}}</h2>
+  </div>
+</div>
+<script>
+  // Deterministic: draw only from t (seconds). No Date.now(), no unseeded Math.random().
+  const cv = document.getElementById("cv");
+  const ctx = cv.getContext("2d");
+  const C = window.BRAND.colors;
+  function render(t) {
+    ctx.fillStyle = C.bg;
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    const r = Math.min(cv.width, cv.height) * 0.25;
+    ctx.strokeStyle = C.primary;
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.arc(cv.width / 2, cv.height / 2, r, 0, Math.min(1, t / 2) * Math.PI * 2);
+    ctx.stroke();
+  }
+  const S = OS.scene("{{id}}");
+  S.drive(render);
+  S.enter(".os-h2", { at: 0.5 });
+  S.done();
+</script>
+</body>
+</html>

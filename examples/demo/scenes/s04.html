@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1920, height=1080" />
+<!-- one-studio scene s04 (lottie). Edit content and the timeline only; styles come from brand tokens. -->
+<link rel="stylesheet" href="../assets/brand.css" />
+<link rel="stylesheet" href="../assets/os.css" />
+<script src="../assets/vendor/gsap.min.js"></script>
+<script src="../assets/vendor/lottie.min.js"></script>
+<script src="../assets/brand.js"></script>
+<script src="../assets/os.js"></script>
+</head>
+<body>
+<div id="root" class="os-scene" data-composition-id="s04" data-start="0" data-duration="6" data-width="1920" data-height="1080"
+     data-transition-in="cut" data-transition-out="cut" data-transition-duration="0.4"
+     style="--w: 1920px; --h: 1080px">
+  <div class="os-frame os-center clip" data-start="0" data-duration="6" data-track-index="0">
+    <div class="os-media" id="anim" style="height: 50%"></div>
+    <h2 class="os-h2">Tập sau: chiếc đồng hồ chính xác nhất trên quỹ đạo</h2>
+    <p class="os-body os-accent cta">Theo dõi kênh để không bỏ lỡ</p>
+  </div>
+</div>
+<script src="../assets/lottie/satellite.js"></script>
+<script>
+  const S = OS.scene("s04");
+  S.lottie("#anim", window.LOTTIE["satellite"], { loop: true });
+  S.enter("#anim", { at: 0, kind: "scale" });
+  S.words(".os-h2", { at: 0.8 });
+  S.enter(".cta", { at: 3.2, kind: "up" });
+  S.done();
+</script>
+</body>
+</html>

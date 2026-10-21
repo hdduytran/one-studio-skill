@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1920, height=1080" />
+<!-- one-studio scene s01 (text). Edit content and the timeline only; styles come from brand tokens. -->
+<link rel="stylesheet" href="../assets/brand.css" />
+<link rel="stylesheet" href="../assets/os.css" />
+<script src="../assets/vendor/gsap.min.js"></script>
+<script src="../assets/brand.js"></script>
+<script src="../assets/os.js"></script>
+</head>
+<body>
+<div id="root" class="os-scene" data-composition-id="s01" data-start="0" data-duration="7" data-width="1920" data-height="1080"
+     data-transition-in="fade" data-transition-out="fade" data-transition-duration="0.4"
+     style="--w: 1920px; --h: 1080px">
+  <div class="os-frame os-center clip" data-start="0" data-duration="7" data-track-index="0">
+    <svg class="pin" viewBox="0 0 120 120" style="width: calc(140 * var(--u)); height: auto">
+      <circle class="ring" cx="60" cy="60" r="50" fill="none" stroke="var(--c-accent)" stroke-width="4" />
+      <circle cx="60" cy="60" r="16" fill="var(--c-accent)" />
+    </svg>
+    <h1 class="os-display">Điện thoại <span class="os-accent">không</span> nói chuyện với vệ tinh</h1>
+    <p class="os-h2 os-muted">…vậy sao nó biết bạn ở đâu?</p>
+  </div>
+</div>
+<script>
+  const S = OS.scene("s01");
+  S.enter(".pin", { at: 0.1, kind: "pop" });
+  S.tl.fromTo(".pin .ring", { scale: 0.4, autoAlpha: 1, transformOrigin: "50% 50%" }, { scale: 1.6, autoAlpha: 0, duration: 1.4, repeat: 3, ease: "power1.out" }, 0.4);
+  S.words(".os-display", { at: 0.5 });
+  S.enter(".os-h2", { at: 3.6, kind: "up" });
+  S.done();
+</script>
+</body>
+</html>

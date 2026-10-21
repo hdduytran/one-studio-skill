@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="{{lang}}">
+<head>
+<meta charset="utf-8" />
+<!-- one-studio character scene {{id}} — lemo-opuscar page contract (style: {{style}}).
+     Rewrite render(t) following $LIB/styles/{{style}}/STYLE.md. Deterministic: draw only from t. -->
+<style>html, body { margin: 0; background: #000; overflow: hidden; } canvas { display: block; }</style>
+<script src="brand.js"></script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+  const W = innerWidth, H = innerHeight;
+  const cv = document.getElementById("c");
+  cv.width = W; cv.height = H;
+  const ctx = cv.getContext("2d");
+  const C = window.BRAND.colors;
+  const u = Math.min(W, H) / 1080;
+
+  window.DUR = {{duration}};
+  window.EV = [];
+  const ease = (x) => 0.5 - Math.cos(Math.PI * Math.min(1, Math.max(0, x))) / 2;
+
+  // Placeholder character: a bouncing round mascot that waves, in brand colours.
+  window.render = (t) => {
+    ctx.fillStyle = C.bg;
+    ctx.fillRect(0, 0, W, H);
+    const enter = ease(t / 0.8);
+    const bounce = Math.abs(Math.sin(t * 3)) * 30 * u;
+    const x = W / 2, y = H * 0.55 - bounce;
+    ctx.globalAlpha = enter;
+    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    ctx.beginPath(); ctx.ellipse(x, H * 0.55 + 190 * u, (150 - bounce / 3) * u, 24 * u, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = C.primary;
+    ctx.beginPath(); ctx.arc(x, y, 170 * u, 0, Math.PI * 2); ctx.fill();
+    const blink = (t % 2.6) < 0.12 ? 0.15 : 1;
+    ctx.fillStyle = C.fg;
+    for (const dx of [-60, 60]) { ctx.beginPath(); ctx.ellipse(x + dx * u, y - 30 * u, 22 * u, 30 * u * blink, 0, 0, Math.PI * 2); ctx.fill(); }
+    ctx.strokeStyle = C.accent; ctx.lineWidth = 18 * u; ctx.lineCap = "round";
+    const wave = Math.sin(t * 6) * 0.5;
+    ctx.beginPath(); ctx.moveTo(x + 150 * u, y); ctx.lineTo(x + (150 + Math.cos(-1 + wave) * 120) * u, y + Math.sin(-1 + wave) * 120 * u); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, y + 40 * u, 60 * u, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+    ctx.globalAlpha = 1;
+    const fadeOut = 1 - ease((window.DUR - t) / 0.4);
+    if (fadeOut > 0) { ctx.fillStyle = C.bg; ctx.globalAlpha = fadeOut; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+  };
+  window.TEXTS = () => [];
+  document.fonts.ready.then(() => { window.render(0); window.READY = true; });
+</script>
+</body>
+</html>

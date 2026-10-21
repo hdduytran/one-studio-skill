@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="{{lang}}">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width={{width}}, height={{height}}" />
+<!-- one-studio scene {{id}} ({{type}}). Edit content and the timeline only; styles come from brand tokens. -->
+<link rel="stylesheet" href="../assets/brand.css" />
+<link rel="stylesheet" href="../assets/os.css" />
+<script src="../assets/vendor/gsap.min.js"></script>
+{{extra_head}}<script src="../assets/brand.js"></script>
+<script src="../assets/os.js"></script>
+</head>
+<body>
+<div id="root" class="os-scene" data-composition-id="{{id}}" data-start="0" data-duration="{{duration}}" data-width="{{width}}" data-height="{{height}}"
+     data-transition-in="{{transition_in}}" data-transition-out="{{transition_out}}" data-transition-duration="{{transition_duration}}"
+     style="--w: {{width}}px; --h: {{height}}px">

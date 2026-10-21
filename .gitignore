@@ -1,0 +1,18 @@
+node_modules/
+.DS_Store
+# Generated inside one-studio projects (recreated by prepare-project / render / audio steps)
+examples/*/out/
+examples/*/review/
+examples/*/audio/
+examples/*/captions.srt
+examples/*/.one-studio/
+examples/*/index.html
+examples/*/hyperframes.json
+examples/*/assets/vendor/
+examples/*/assets/fonts/
+examples/*/assets/lottie/
+examples/*/assets/brand.css
+examples/*/assets/brand.js
+examples/*/assets/os.css
+examples/*/assets/os.js
+.hyperframes/

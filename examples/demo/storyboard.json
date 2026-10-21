@@ -1,0 +1,110 @@
+{
+  "version": 1,
+  "scenes": [
+    {
+      "id": "s01",
+      "title": "Hook",
+      "type": "text",
+      "duration": 7,
+      "goal": "Gây tò mò trong 3 giây đầu",
+      "visual": "Chấm định vị nhấp nháy trên bản đồ tối; kinetic type hai dòng",
+      "lines": [
+        {
+          "id": "s01-1",
+          "text": "Điện thoại của bạn chưa bao giờ nói chuyện với vệ tinh."
+        },
+        {
+          "id": "s01-2",
+          "text": "Vậy mà nó biết bạn đang đứng ở đâu."
+        }
+      ],
+      "transition": {
+        "kind": "fade",
+        "duration": 0.4
+      }
+    },
+    {
+      "id": "s02",
+      "title": "Nghe tín hiệu",
+      "type": "diagram",
+      "duration": 10,
+      "goal": "Điện thoại chỉ nhận, không gửi",
+      "visual": "4 vệ tinh phát sóng tròn xuống điện thoại; đường vẽ dần (DrawSVG)",
+      "lines": [
+        {
+          "id": "s02-1",
+          "text": "Mỗi vệ tinh liên tục phát đi thời gian của chính nó."
+        },
+        {
+          "id": "s02-2",
+          "text": "Điện thoại chỉ nghe và đo tín hiệu đến trễ bao lâu."
+        }
+      ],
+      "transition": {
+        "kind": "slide-left",
+        "duration": 0.5
+      }
+    },
+    {
+      "id": "s03",
+      "title": "Bốn vệ tinh",
+      "type": "data",
+      "duration": 12,
+      "goal": "4 vệ tinh → sai số vài mét",
+      "visual": "Biểu đồ cột sai số theo số vệ tinh, cột cuối màu accent",
+      "data": [
+        {
+          "satellites": 1,
+          "error_m": 20000
+        },
+        {
+          "satellites": 2,
+          "error_m": 3000
+        },
+        {
+          "satellites": 3,
+          "error_m": 150
+        },
+        {
+          "satellites": 4,
+          "error_m": 5
+        }
+      ],
+      "lines": [
+        {
+          "id": "s03-1",
+          "text": "Một vệ tinh cho bạn một vòng tròn khả năng."
+        },
+        {
+          "id": "s03-2",
+          "text": "Đến vệ tinh thứ 4, sai số chỉ còn vài mét.",
+          "say": "Đến vệ tinh thứ tư, sai số chỉ còn vài mét."
+        }
+      ],
+      "transition": {
+        "kind": "fade",
+        "duration": 0.4
+      }
+    },
+    {
+      "id": "s04",
+      "title": "Kết",
+      "type": "lottie",
+      "duration": 6,
+      "goal": "CTA theo dõi kênh",
+      "visual": "Icon vệ tinh Lottie xoay, logo + CTA",
+      "lines": [
+        {
+          "id": "s04-1",
+          "text": "Tập sau: chiếc đồng hồ chính xác nhất trên quỹ đạo."
+        }
+      ],
+      "transition": {
+        "kind": "cut"
+      },
+      "assets": [
+        "assets/satellite.json"
+      ]
+    }
+  ]
+}
