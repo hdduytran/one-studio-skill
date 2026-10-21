@@ -3,14 +3,24 @@
 //   node init-project.mjs <dir> [--title "…"] [--lang vi] [--dimension 2d|3d|mixed]
 //        [--aspect 16:9|9:16|1:1|4:5] [--fps 30] [--duration 45]
 //        [--series <name>] [--series-root <dir>]   (default series root: <dir>/../series)
+//        [--preset <brand preset>] [--captions none|sidecar|mux|burn] [--exports 16:9,9:16]
+//        [--tts-url <base_url>] [--voice <id>] [--probe-tts]
 // With --series, the brand kit lives at <series-root>/<name>/brand/brand.json and is reused
 // as-is when it already exists (no brand questions for later episodes).
+// --probe-tts lists the TTS server's voices (GET only, no synthesis) so the user can pick one;
+// burned captions need FFmpeg with libass: without it the caption mode falls back to mux.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { ASPECTS, ENGINE_VERSIONS, TEMPLATE_DIR, now, parseArgs, readJson, writeJson } from "./lib/project.mjs";
+import { CAPTION_MODES } from "./lib/captions.mjs";
+import { hasDrawtext, hasLibass } from "./lib/ffmpeg.mjs";
+import { PRESET_NAMES, applyPreset } from "./lib/presets.mjs";
+import { listVoices } from "./lib/tts.mjs";
 
 const USAGE = `usage: init-project.mjs <dir> [--title "…"] [--lang vi] [--dimension 2d|3d|mixed]
-       [--aspect 16:9|9:16|1:1|4:5] [--fps 30] [--duration 45] [--series <name>] [--series-root <dir>]`;
+       [--aspect 16:9|9:16|1:1|4:5] [--fps 30] [--duration 45] [--series <name>] [--series-root <dir>]
+       [--preset ${PRESET_NAMES().join("|")}] [--captions ${CAPTION_MODES.join("|")}] [--exports 16:9,9:16]
+       [--tts-url <base_url>] [--voice <id>] [--probe-tts]`;
 
 const fill = (text, vars) => text.replace(/\{\{(\w+)\}\}/g, (m, k) => (k in vars ? String(vars[k]) : m));
 
@@ -38,11 +48,18 @@ function defaultTts(lang) {
   };
 }
 
+// A fresh brand kit from the template, optionally starting from a preset.
+function writeNewBrand(brandPath, name, preset) {
+  mkdirSync(dirname(brandPath), { recursive: true });
+  let brand = JSON.parse(fill(readFileSync(join(TEMPLATE_DIR, "brand.json"), "utf8"), { name }));
+  if (preset) brand = applyPreset(brand, preset);
+  writeJson(brandPath, brand);
+}
+
 function ensureBrand(root, name, args) {
   if (!args.series) {
     const brandPath = join(root, "brand", "brand.json");
-    mkdirSync(dirname(brandPath), { recursive: true });
-    writeFileSync(brandPath, fill(readFileSync(join(TEMPLATE_DIR, "brand.json"), "utf8"), { name }));
+    writeNewBrand(brandPath, name, args.preset);
     return { brandPath, reused: false, series: null };
   }
   const series = slug(args.series);
@@ -50,10 +67,7 @@ function ensureBrand(root, name, args) {
   const seriesDir = join(seriesRoot, series);
   const brandPath = join(seriesDir, "brand", "brand.json");
   const reused = existsSync(brandPath);
-  if (!reused) {
-    mkdirSync(dirname(brandPath), { recursive: true });
-    writeFileSync(brandPath, fill(readFileSync(join(TEMPLATE_DIR, "brand.json"), "utf8"), { name: series }));
-  }
+  if (!reused) writeNewBrand(brandPath, series, args.preset);
   const seriesFile = join(seriesDir, "series.json");
   const info = existsSync(seriesFile) ? readJson(seriesFile) : { name: series, brand: "brand/brand.json", episodes: [] };
   const projectRel = relative(seriesDir, root);
@@ -86,10 +100,10 @@ function seriesBumpers(root, brand, { title, language, format, episode }) {
   return out;
 }
 
-function main() {
+async function main() {
   const args = parseArgs(process.argv.slice(2), {
-    flags: ["help"],
-    options: ["title", "lang", "dimension", "aspect", "fps", "duration", "series", "series-root"],
+    flags: ["help", "probe-tts"],
+    options: ["title", "lang", "dimension", "aspect", "fps", "duration", "series", "series-root", "preset", "captions", "exports", "tts-url", "voice"],
   });
   const dir = args._[0];
   if (args.help || !dir) {
@@ -106,6 +120,10 @@ function main() {
   if (args.dimension && !["2d", "3d", "mixed"].includes(args.dimension)) throw new Error("--dimension must be 2d, 3d or mixed");
   if (args.fps && !(Number.isInteger(Number(args.fps)) && args.fps >= 1 && args.fps <= 120)) throw new Error("--fps must be an integer 1–120");
   if (args.duration && !(Number(args.duration) > 0)) throw new Error("--duration must be a positive number of seconds");
+  if (args.preset && !PRESET_NAMES().includes(args.preset)) throw new Error(`--preset must be one of ${PRESET_NAMES().join(", ")}`);
+  if (args.captions && !CAPTION_MODES.includes(args.captions)) throw new Error(`--captions must be one of ${CAPTION_MODES.join(", ")}`);
+  const exportsArg = args.exports ? args.exports.split(",").map((r) => r.trim()) : null;
+  for (const r of exportsArg ?? []) if (!ASPECTS[r]) throw new Error(`--exports: unknown aspect ${r}`);
 
   const name = slug(basename(root));
   for (const sub of ["assets", "scenes", "audio", "review", "out/scenes"]) mkdirSync(join(root, sub), { recursive: true });
@@ -125,9 +143,40 @@ function main() {
     writeFileSync(join(root, file), fill(readFileSync(join(TEMPLATE_DIR, file), "utf8"), vars));
   }
 
-  const format = { aspect, ...ASPECTS[aspect], fps, target_duration: duration, exports: prev?.format?.aspect === aspect ? prev.format.exports ?? [aspect] : [aspect] };
+  const exportsList = exportsArg ? [aspect, ...exportsArg.filter((r) => r !== aspect)] : prev?.format?.aspect === aspect ? prev.format.exports ?? [aspect] : [aspect];
+  const format = { aspect, ...ASPECTS[aspect], fps, target_duration: duration, exports: exportsList };
   const bumpers = seriesBumpers(root, brand, { title, language, format, episode: brand.episode });
   writeJson(join(root, "storyboard.json"), { version: 1, scenes: bumpers });
+
+  // Captions (gate 0 question): a new brand kit stores the choice; a reused series kit is not touched,
+  // the episode gets its own override instead. burn needs libass: fall back to mux when it is missing.
+  const libass = hasLibass();
+  const notes = [];
+  let capMode = args.captions ?? null;
+  const brandNow = readJson(brand.brandPath);
+  const brandMode = brandNow.captions?.enabled === false ? "none" : brandNow.captions?.mode ?? "burn";
+  if ((capMode ?? (brand.reused ? null : brandMode)) === "burn" && !libass) {
+    capMode = "mux";
+    notes.push("FFmpeg has no libass (no `subtitles` filter): captions cannot be burned in → mux (soft track + .srt). Install FFmpeg with libass to burn them.");
+  }
+  let studioCaptions = null;
+  if (capMode && !brand.reused) {
+    brandNow.captions = { ...(brandNow.captions ?? {}), enabled: capMode !== "none", mode: capMode === "none" ? brandNow.captions?.mode ?? "burn" : capMode };
+    writeJson(brand.brandPath, brandNow);
+  } else if (capMode && capMode !== brandMode) studioCaptions = { enabled: capMode !== "none", mode: capMode };
+
+  const tts = sameLang ? prev.audio.tts : defaultTts(language);
+  const ttsKey = tts[language] ? language : "default";
+  if (args["tts-url"]) tts[ttsKey] = { ...tts[ttsKey], base_url: args["tts-url"] };
+  if (args.voice) tts[ttsKey] = { ...tts[ttsKey], voice: args.voice };
+  let voices = null;
+  if (args["probe-tts"]) {
+    try {
+      voices = await listVoices(tts[ttsKey]);
+    } catch (err) {
+      notes.push(`TTS voices: ${err.message}. Start the server, then: tts-openai-compatible.mjs --voices <dir>`);
+    }
+  }
 
   const studio = {
     version: 1,
@@ -137,11 +186,12 @@ function main() {
     engine: { default: "hyperframes", dimension, versions: { ...ENGINE_VERSIONS } },
     services: sameLang ? { ...prev.services } : { tts: false, lemo: false, anatomy: false, remotion: false },
     gates: { setup: { done: true, at: now() } },
+    ...(studioCaptions && { captions: studioCaptions }),
     scenes: [],
     audio: {
-      tts: sameLang ? prev.audio.tts : defaultTts(language),
+      tts,
       music: null,
-      sfx: false,
+      sfx: true,
       loudness: prev?.audio?.loudness ?? -14,
       sentence_pause: prev?.audio?.sentence_pause ?? 0.25,
       scene_padding: prev?.audio?.scene_padding ?? 0.5,
@@ -154,19 +204,28 @@ function main() {
   console.log(`Created one-studio project: ${root}`);
   console.log(`  format    ${aspect} ${studio.format.width}x${studio.format.height} @ ${fps} fps, ~${duration}s`);
   console.log(`  engine    ${studio.engine.default} (${dimension})`);
-  const tts = studio.audio.tts[language] ?? studio.audio.tts.default;
-  console.log(`  voice     ${language} → ${tts.model} @ ${tts.base_url}, voice "${tts.voice}"${sameLang ? ` (from ${brand.previousName})` : " (placeholder: confirm before first call)"}`);
+  const ep = studio.audio.tts[ttsKey];
+  const confirmed = sameLang || args.voice;
+  console.log(`  voice     ${language} → ${ep.model} @ ${ep.base_url}, voice "${ep.voice}"${sameLang ? ` (from ${brand.previousName})` : args.voice ? "" : " (placeholder: pick one by ear before the first call)"}`);
+  if (voices) {
+    const ok = voices.voices.includes(ep.voice);
+    console.log(`  voices    ${voices.voices.length} on the server: ${voices.voices.join(", ")}${ok ? "" : `  ← "${ep.voice}" is not one of them`}`);
+    if (!ok || !confirmed) console.log(`            samples: tts-openai-compatible.mjs <dir> --samples all --allow-tts (ask first) → audio-picker.mjs → --use-voice <id>`);
+  }
+  const finalBrand = readJson(brand.brandPath);
+  console.log(`  look      ${finalBrand.preset ?? "default"}${finalBrand.surface === "glass" ? " · glass surface" : ""}  (compare: compare-presets.mjs <dir>)`);
+  console.log(`  captions  ${studioCaptions?.enabled === false || (!studioCaptions && finalBrand.captions?.enabled === false) ? "none" : studioCaptions?.mode ?? finalBrand.captions?.mode ?? "burn"}${libass ? "" : " (no libass here: burn → mux)"}${hasDrawtext() ? "" : " · no drawtext: contact sheets unlabelled"}`);
+  if (format.exports.length > 1) console.log(`  exports   ${format.exports.join(", ")} (keyframe-stills shows every ratio at gate 5)`);
+  for (const n of notes) console.log(`  ⚠ ${n}`);
   if (brand.series) {
     console.log(`  series    ${brand.series}, episode ${brand.episode}`);
     console.log(`  brand     ${brand.reused ? "reused" : "created"} ${brand.brandPath}`);
-  } else console.log(`  brand     created ${brand.brandPath} (defaults; customise at gate 0)`);
+  } else console.log(`  brand     created ${brand.brandPath} (${args.preset ? `preset ${args.preset}` : "defaults"}; customise at gate 0)`);
   if (bumpers.length) console.log(`  bumpers   ${bumpers.map((b) => b.id).join(", ")} from the series brand (keep them first/last in the storyboard)`);
   console.log("Next: gate 1 — fill brief.md, then: node status.mjs <dir> --approve brief");
 }
 
-try {
-  main();
-} catch (err) {
+main().catch((err) => {
   console.error(err.message);
   process.exit(1);
-}
+});

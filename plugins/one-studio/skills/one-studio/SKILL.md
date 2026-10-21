@@ -24,20 +24,21 @@ You are the producer. You move one project through numbered gates, stop at every
 | 2 | Script | `script.md`: `## sNN · title`, one bullet = one sentence | **user OK** → `--approve script` |
 | 3 | Storyboard | `storyboard.json` (`schemas/storyboard.schema.json`) | **user OK** → `--approve storyboard` |
 | 4 | Estimate | `status.mjs --estimate`, show the table | **user accepts** → `--approve estimate` |
-| 5 | Keyframes | `prepare-project` → `new-scene` → write scenes → `keyframe-stills` → show `review/sheet.jpg` | **user OK per scene** → `--approve-scenes <ids>` → `--approve keyframes` |
+| 5 | Keyframes | `prepare-project` → `new-scene` → write scenes → `keyframe-stills` → show `review/sheet.jpg` (+ `sheet-<ratio>.jpg` per export) | **user OK per scene** → `--approve-scenes <ids>` → `--approve keyframes` |
 | 6 | Build | `render-changed-scenes --preview` (only approved, changed scenes) | `--approve build` |
-| 7 | Audio | `build-audio` (asks before TTS), fits scene lengths, captions | `--approve audio` |
+| 7 | Audio | music pick (`make-music --samples` → `audio-picker` → `--use`), SFX cues, `build-audio` (asks before TTS), fits lengths + `data-line` reveals, captions | `--approve audio` |
 | 8 | Preview | `render-changed-scenes --preview` + `concat-and-mix --preview` | **user OK** → `--approve preview` |
 | 9 | Render | `--estimate`, `render-changed-scenes`, `concat-and-mix` | `--approve render` |
-| 10 | Publish | `publish` (extra ratios, thumbnails, manifest) | `--approve publish` |
+| 10 | Publish | `publish [--thumb-frame s02@3.5]` (extra ratios, thumbnails, manifest) | `--approve publish` |
 
 Gate 0 asks, in ONE message, only what is missing (defaults in brackets):
 - new video or episode of a series? (existing series → brand, voice, format, intro/outro reused: ask nothing about them)
 - 2D, 3D or mixed? [2D] · aspect ratio(s) and length? [16:9, 30–60 s]
-- voice-over language? [the user's] — `vi` → ZeroTTS, others → OmniVoice (local, OpenAI-compatible); confirm base URL + voice once
-- brand colours/fonts/logo, or defaults? · allowed paid/remote services? [none]
+- voice-over language? [the user's] — `vi` → ZeroTTS, others → OmniVoice (local, OpenAI-compatible); confirm base URL once; the voice is picked by ear (samples + `audio-picker`), never left at `default`
+- brand colours/fonts/logo, a preset (`apple-light`, `apple-keynote`, `neon-terminal`, `synthwave`, `ocean-calm`, `warm-editorial`, `swiss-mono`), or defaults? · allowed paid/remote services? [none]
+- captions? none · .srt only · soft track · burned in [burn; mux when FFmpeg has no libass]
 
-Then `node "$S/scripts/init-project.mjs" <dir> --title "…" --lang vi --dimension 2d --aspect 16:9 --duration 45 [--series <name>]`, write the answers into `brand.json` and `studio.json → audio.tts`, `format.exports`.
+Then `node "$S/scripts/init-project.mjs" <dir> --title "…" --lang vi --dimension 2d --aspect 16:9 --duration 45 [--exports 16:9,9:16] [--preset …] [--captions …] [--tts-url … --probe-tts] [--series <name>]`, write remaining answers into `brand.json` and `studio.json → audio.tts`. Exact wording: `references/workflow-gates.md`.
 
 Approval rules:
 - An approval is the user's explicit OK in chat. Never run `--approve` / `--approve-scenes` for gates 2, 3, 4, 5, 8 without it; show what is approved (script, scene table, estimate, contact sheet, preview path) in the same message as the question.
@@ -57,23 +58,25 @@ Read a reference only when you are about to build a scene of that type; read `re
 | character | lemo-opuscar clip | `scene-types/character-lemo.md` | lemo-opuscar; ONE `styles/<slug>/STYLE.md` |
 | 3d | three.js in HyperFrames; Remotion if `three.physics`/`three.postfx` | `scene-types/3d.md` | remotion (only for physics/post-fx) |
 
-Engines and traps: `references/engine-selection.md`. Rendering, cache, brand changes: `references/render-ffmpeg.md`. Audio: `references/audio-tts.md`. Series & publishing: `references/series-publish.md`.
+Engines and traps: `references/engine-selection.md`. Rendering, cache, brand changes: `references/render-ffmpeg.md`. Audio (voices, music beds, SFX cues, captions, howler.js vs FFmpeg): `references/audio-tts.md`. Series & publishing: `references/series-publish.md`.
 
 ## Credit discipline
 
 - Show `status.mjs --estimate` before gates 5, 6 and 9 (tokens only for scenes to write/fix; render time only for scenes without a clip). Stop and ask on ⚠.
 - One scene = one file = one clip. Editing a scene re-reads only that scene's reference and re-renders only that scene.
 - Look at contact sheets yourself before showing them; fix obvious faults first.
-- Never call TTS, download or install anything without consent (`studio.json → services`). Keep chat output to tables and paths.
+- Never call TTS, download or install anything without consent (`studio.json → services`). Music beds and SFX are synthesised locally (no consent needed); voice samples are TTS calls (ask). Keep chat output to tables and paths.
 
 ## Consistency
 
-- Scenes use brand variables and `os-*` classes only; `prepare-project.mjs` regenerates `assets/brand.css` from `brand.json`.
+- Scenes use brand variables and `os-*` classes only; `prepare-project.mjs` regenerates `assets/brand.css` from `brand.json` (incl. the glass surface: never add per-scene `<link>`s for it).
+- Ratio-specific CSS goes in `<style data-ratio="9:16">` blocks, never in the main styles, so the main ratio keeps its approval and clips.
+- The delivered sound is FFmpeg's mix only (`concat-and-mix`); howler.js is for the picker page and studio preview.
 - All clips are normalised to one encode; clips from lemo/Remotion are re-encoded to match before the stream-copy concat.
 - Brand change: bump `version`, run `prepare-project` and `render-changed-scenes --dry-run`, tell the user how many scenes need review/render, ask first.
 
 ## Files in a project
 
-`brief.md` · `script.md` · `storyboard.json` · `studio.json` (state) · `brand/` or `../series/<name>/brand/` · `assets/` · `scenes/<id>.html` (or `scenes/<id>/` for lemo, `remotion/` for R3F) · `audio/` · `captions.srt` · `review/sheet.jpg` · `out/scenes/<id>-<hash>.mp4` · `out/<name>.mp4` · `out/manifest.json`
+`brief.md` · `script.md` · `storyboard.json` · `studio.json` (state) · `brand/` or `../series/<name>/brand/` · `assets/` (`music/`, `sfx/`, `audio-cues.js`) · `scenes/<id>.html` (or `scenes/<id>/` for lemo, `remotion/` for R3F) · `audio/` · `captions.srt` · `review/sheet*.jpg`, `review/audio-picker.html`, `review/voices/`, `review/music/`, `review/presets.jpg` · `out/scenes/<id>-<hash>.mp4` · `out/<name>.mp4` · `out/manifest.json`
 
-Check any time: `node "$S/scripts/validate.mjs" <dir>`, `node "$S/scripts/check-external.mjs" <dir>`.
+Check any time: `node "$S/scripts/validate.mjs" <dir>`, `node "$S/scripts/check-external.mjs" <dir>` (also reports missing libass / drawtext; both have fallbacks).

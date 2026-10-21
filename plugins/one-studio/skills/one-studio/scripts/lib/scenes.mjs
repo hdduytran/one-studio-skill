@@ -53,13 +53,17 @@ export function renderSceneTemplate(project, scene) {
 }
 
 // index.html mounts every HyperFrames scene in order, for Studio preview and full-cut snapshots.
-export function buildIndex(project) {
+// opts.outDir: write the index elsewhere (a staging copy with its own scenes/ and assets/); opts.ids: subset.
+export function buildIndex(project, { outDir = project.root, ids = null } = {}) {
   const { width, height, fps } = project.studio.format;
   let t = 0;
   const mounts = [];
+  const starts = {};
   for (const scene of project.storyboard?.scenes ?? []) {
+    if (ids && !ids.includes(scene.id)) continue;
     if (sceneEngine(scene, project.studio) !== "hyperframes" || !existsSync(sceneFile(project, scene.id))) continue;
     const d = effectiveDuration(project, scene);
+    starts[scene.id] = { start: t, duration: d };
     mounts.push(`    <div id="mount-${scene.id}" data-composition-id="${scene.id}" data-composition-src="scenes/${scene.id}.html" data-start="${+t.toFixed(3)}" data-duration="${d}" data-track-index="0"></div>`);
     t += d;
   }
@@ -84,9 +88,37 @@ ${mounts.join("\n")}
 </body>
 </html>
 `;
-  writeFileSync(join(project.root, "index.html"), html);
-  return { scenes: mounts.length, duration: t };
+  writeFileSync(join(outDir, "index.html"), html);
+  return { scenes: mounts.length, duration: t, starts };
 }
 
 export const listSceneFiles = (project) =>
   existsSync(join(project.root, "scenes")) ? readdirSync(join(project.root, "scenes")).filter((f) => f.endsWith(".html")) : [];
+
+// ---------- VO sync: <script type="application/json" id="os-lines"> ----------
+// Scenes tag elements with data-line="s02-2"; S.lines() in os.js reveals each one when its sentence starts.
+// The timings (scene-relative, from build-audio) live in a JSON block inside the scene, so only the scenes
+// whose timings changed re-render. The keyframe gate ignores this block (see sceneText in hash.mjs).
+const LINES_RE = /<script\b[^>]*\bid\s*=\s*["']os-lines["'][^>]*>[\s\S]*?<\/script>\n?/i;
+export const usesLineSync = (html) => /\bdata-line\s*=/.test(html) || LINES_RE.test(html);
+
+// lines: [{ id, start, duration }] → true when the file changed.
+export function writeLineTimes(project, scene, lines) {
+  if (sceneEngine(scene, project.studio) !== "hyperframes") return false;
+  const file = sceneFile(project, scene.id);
+  if (!existsSync(file)) return false;
+  const html = readFileSync(file, "utf8");
+  if (!usesLineSync(html)) return false;
+  const times = Object.fromEntries(lines.map((l) => [l.id, { start: l.start, end: Math.round((l.start + l.duration) * 1000) / 1000 }]));
+  const block = `<script type="application/json" id="os-lines">${JSON.stringify(times)}</script>\n`;
+  let next;
+  if (LINES_RE.test(html)) next = html.replace(LINES_RE, block);
+  else {
+    // Before the scene's own script, so it is parsed when S.lines() runs.
+    const at = html.search(/<script>(?=[\s\S]*?OS\.scene\()/);
+    next = at >= 0 ? html.slice(0, at) + block + html.slice(at) : html.replace(/<\/body>/i, `${block}</body>`);
+  }
+  if (next === html) return false;
+  writeFileSync(file, next);
+  return true;
+}

@@ -19,16 +19,15 @@
       <circle class="ring" cx="60" cy="60" r="50" fill="none" stroke="var(--c-accent)" stroke-width="4" />
       <circle cx="60" cy="60" r="16" fill="var(--c-accent)" />
     </svg>
-    <h1 class="os-display">Điện thoại <span class="os-accent">không</span> nói chuyện với vệ tinh</h1>
-    <p class="os-h2 os-muted">…vậy sao nó biết bạn ở đâu?</p>
+    <h1 class="os-display" data-line="s01-1" data-enter="words" data-at="0.5">Điện thoại <span class="os-accent">không</span> nói chuyện với vệ tinh</h1>
+    <p class="os-h2 os-muted" data-line="s01-2" data-at="3.6">…vậy sao nó biết bạn ở đâu?</p>
   </div>
 </div>
 <script>
   const S = OS.scene("s01");
   S.enter(".pin", { at: 0.1, kind: "pop" });
   S.tl.fromTo(".pin .ring", { scale: 0.4, autoAlpha: 1, transformOrigin: "50% 50%" }, { scale: 1.6, autoAlpha: 0, duration: 1.4, repeat: 3, ease: "power1.out" }, 0.4);
-  S.words(".os-display", { at: 0.5 });
-  S.enter(".os-h2", { at: 3.6, kind: "up" });
+  S.lines(); // each [data-line] appears when its VO sentence starts (data-at until the VO exists)
   S.done();
 </script>
 </body>

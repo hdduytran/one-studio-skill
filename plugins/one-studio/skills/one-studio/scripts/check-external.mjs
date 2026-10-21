@@ -9,6 +9,8 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { ENGINE_VERSIONS, isMain, loadProject, parseArgs, sceneEngine } from "./lib/project.mjs";
 import { lemoLib } from "./lib/engines.mjs";
+import { hasDrawtext, hasLibass } from "./lib/ffmpeg.mjs";
+import { captionSetting } from "./lib/captions.mjs";
 
 const has = (bin, args = ["-version"]) => spawnSync(bin, args, { encoding: "utf8" }).status === 0;
 
@@ -32,10 +34,17 @@ function findSkill(name) {
 }
 
 export const CHECKS = {
-  ffmpeg: () => {
+  // Missing libass / drawtext never block: captions fall back to mux, contact sheets lose their labels.
+  ffmpeg: (project) => {
     const ok = has("ffmpeg") && has("ffprobe");
-    const libass = ok && /\bsubtitles\b/.test(spawnSync("ffmpeg", ["-hide_banner", "-filters"], { encoding: "utf8" }).stdout);
-    return { ok, detail: ok ? `ffmpeg found${libass ? ", libass ok" : ", NO libass (captions cannot be burned; use mux/sidecar)"}` : "missing", install: "macOS: brew install ffmpeg · Ubuntu: sudo apt install ffmpeg · Windows: winget install ffmpeg" };
+    const libass = ok && hasLibass();
+    const drawtext = ok && hasDrawtext();
+    const wantsBurn = project ? captionSetting(project) === "burn" : false;
+    const parts = [
+      libass ? "libass ok" : `NO libass (burned captions impossible${wantsBurn ? ": this project's burn captions will be muxed as a soft track + .srt" : "; use mux/sidecar"})`,
+      drawtext ? "drawtext ok" : "NO drawtext (contact sheets without labels)",
+    ];
+    return { ok, detail: ok ? `ffmpeg found, ${parts.join(", ")}` : "missing", install: "macOS: brew install ffmpeg (core formula may lack libass/freetype: the homebrew-ffmpeg/ffmpeg tap or a static build has them) · Ubuntu: sudo apt install ffmpeg · Windows: winget install ffmpeg" };
   },
   hyperframes: () => {
     const v = ENGINE_VERSIONS.hyperframes;

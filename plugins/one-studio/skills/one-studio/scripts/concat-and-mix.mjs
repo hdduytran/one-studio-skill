@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// Assemble the video: concat scene clips (stream copy, storyboard order), mix VO + music (ducked),
-// two-pass loudnorm to the target LUFS, captions (burn / mux / sidecar per brand.captions.mode).
+// Assemble the video: concat scene clips (stream copy, storyboard order), mix VO + music (ducked) + SFX cues,
+// two-pass loudnorm to the target LUFS, captions (none / sidecar / mux / burn: studio.captions, else brand.captions;
+// burn falls back to mux when FFmpeg has no libass). FFmpeg owns the final mix: browser audio is never captured.
 //   node concat-and-mix.mjs <project-dir> [--preview] [--no-captions]
 // Output: out/<name>.mp4 (or out/<name>-preview.mp4) + out/<name>.srt; recorded in studio.json → outputs.
 import { copyFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
@@ -8,7 +9,10 @@ import { join, relative } from "node:path";
 import { isMain, loadProject, now, parseArgs } from "./lib/project.mjs";
 import { audioHash } from "./lib/hash.mjs";
 import { gateInputHash, outputPath, readAudioManifest } from "./lib/gates.mjs";
-import { checkClips, concatCopy, encodeSettings, normalize, probe, run } from "./lib/ffmpeg.mjs";
+import { checkClips, concatCopy, encodeSettings, hasLibass, normalize, probe, run } from "./lib/ffmpeg.mjs";
+import { captionMode } from "./lib/captions.mjs";
+import { placeCues, sfxCues } from "./lib/sfx.mjs";
+import { effectiveDuration } from "./lib/scenes.mjs";
 import { planRender } from "./render-changed-scenes.mjs";
 
 // "#rrggbb" / "rgba(r,g,b,a)" → ASS &HAABBGGRR
@@ -62,35 +66,88 @@ export function integratedLufs(file) {
   return m ? Number(m[1]) : null;
 }
 
-// Mixed, loudness-normalised stereo WAV at 48 kHz, exactly `dur` seconds long.
-function buildMix(project, manifest, dur, tmp) {
-  const target = project.studio.audio?.loudness ?? -14;
-  const music = project.studio.audio?.music ? join(project.root, project.studio.audio.music) : null;
-  const vo = manifest?.vo ? join(project.root, manifest.vo) : null;
-  const raw = join(tmp, "mix-raw.wav");
-  const fmt = "aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo";
-  if (vo && music) {
-    run("ffmpeg", ["-y", "-v", "error", "-i", vo, "-stream_loop", "-1", "-i", music, "-filter_complex",
-      `[0:a]${fmt},apad[vo];[1:a]${fmt},volume=0.5,afade=t=out:st=${Math.max(0, dur - 2)}:d=2[m];[vo]asplit=2[vo1][key];[m][key]sidechaincompress=threshold=0.03:ratio=10:attack=15:release=350[duck];[vo1][duck]amix=inputs=2:normalize=0:duration=longest[mix]`,
-      "-map", "[mix]", "-t", String(dur), "-ar", "48000", raw]);
-  } else if (vo) {
-    run("ffmpeg", ["-y", "-v", "error", "-i", vo, "-af", `${fmt},apad`, "-t", String(dur), "-ar", "48000", raw]);
-  } else if (music) {
-    run("ffmpeg", ["-y", "-v", "error", "-stream_loop", "-1", "-i", music, "-af", `${fmt},afade=t=out:st=${Math.max(0, dur - 2)}:d=2`, "-t", String(dur), "-ar", "48000", raw]);
+// Where each scene (and each VO line, scene-relative) starts: from the audio manifest when there is one,
+// else from the storyboard lengths.
+export function timelineStarts(project, manifest) {
+  const sceneStarts = new Map();
+  const lineStarts = new Map();
+  if (manifest?.scenes?.length) {
+    for (const s of manifest.scenes) {
+      sceneStarts.set(s.id, s.start);
+      for (const l of s.lines ?? []) lineStarts.set(l.id, l.start);
+    }
   } else {
-    run("ffmpeg", ["-y", "-v", "error", "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-t", String(dur), raw]);
-    return { file: raw, lufs: null, silent: true };
+    let t = 0;
+    for (const s of project.storyboard?.scenes ?? []) {
+      sceneStarts.set(s.id, t);
+      t += effectiveDuration(project, s);
+    }
   }
+  return { sceneStarts, lineStarts };
+}
+
+// Mixed, loudness-normalised stereo WAV at 48 kHz, exactly `dur` seconds long.
+// VO + music (looped, faded out, ducked under the VO) + SFX cues (placed, never ducked).
+function buildMix(project, manifest, dur, tmp, log = () => {}) {
+  const a = project.studio.audio ?? {};
+  const target = a.loudness ?? -14;
+  const music = a.music ? join(project.root, a.music) : null;
+  if (music && !existsSync(music)) throw new Error(`music file not found: ${a.music} (make-music.mjs <dir> --use <bed>)`);
+  const vo = manifest?.vo ? join(project.root, manifest.vo) : null;
+  let cues = [];
+  if (sfxCues(project).length) {
+    if (a.sfx === false) log(`⚠ ${sfxCues(project).length} SFX cue(s) in the storyboard are muted (studio.json → audio.sfx is false)`);
+    else {
+      const { sceneStarts, lineStarts } = timelineStarts(project, manifest);
+      cues = placeCues(project, sceneStarts, lineStarts, { log }).filter((c) => c.time < dur);
+    }
+  }
+  const raw = join(tmp, "mix-raw.wav");
+  if (!vo && !music && !cues.length) {
+    run("ffmpeg", ["-y", "-v", "error", "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-t", String(dur), raw]);
+    return { file: raw, lufs: null, silent: true, sfx: 0 };
+  }
+  const fmt = "aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo";
+  const inputs = [];
+  const graph = [];
+  const bus = [];
+  const fadeOut = `afade=t=out:st=${Math.max(0, dur - 2)}:d=2`;
+  let n = 0; // FFmpeg input index
+  if (vo) {
+    n++;
+    inputs.push("-i", vo);
+    graph.push(`[0:a]${fmt},apad[vo]`);
+  }
+  if (music) {
+    const k = n++;
+    inputs.push("-stream_loop", "-1", "-i", music);
+    graph.push(`[${k}:a]${fmt},volume=0.5,${fadeOut}[m]`);
+    if (vo) {
+      graph.push("[vo]asplit=2[vo1][key]", "[m][key]sidechaincompress=threshold=0.03:ratio=10:attack=15:release=350[duck]");
+      bus.push("[vo1]", "[duck]");
+    } else bus.push("[m]");
+  } else if (vo) bus.push("[vo]");
+  cues.forEach((c, i) => {
+    const k = n++;
+    inputs.push("-i", c.file);
+    const ms = Math.round(c.time * 1000);
+    graph.push(`[${k}:a]${fmt},volume=${c.gain}dB,adelay=${ms}|${ms}[x${i}]`);
+    bus.push(`[x${i}]`);
+  });
+  graph.push(bus.length > 1 ? `${bus.join("")}amix=inputs=${bus.length}:normalize=0:duration=longest:dropout_transition=0,apad[mix]` : `${bus[0]}apad[mix]`);
+  const script = join(tmp, "mix-graph.txt");
+  writeFileSync(script, graph.join(";\n"));
+  run("ffmpeg", ["-y", "-v", "error", ...inputs, "-filter_complex_script", script, "-map", "[mix]", "-t", String(dur), "-ar", "48000", raw]);
   const m = measureLoudness(raw);
   const out = join(tmp, "mix.wav");
   if (!m || !Number.isFinite(Number(m.input_i)) || Number(m.input_i) < -70) {
     copyFileSync(raw, out);
-    return { file: out, lufs: null, silent: true };
+    return { file: out, lufs: null, silent: true, sfx: cues.length };
   }
   run("ffmpeg", ["-y", "-v", "error", "-i", raw, "-af",
     `loudnorm=I=${target}:TP=-1.5:LRA=11:measured_I=${m.input_i}:measured_TP=${m.input_tp}:measured_LRA=${m.input_lra}:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true,aresample=48000`,
     "-t", String(dur), out]);
-  return { file: out, lufs: null, silent: false };
+  return { file: out, lufs: null, silent: false, sfx: cues.length };
 }
 
 // Concat clips (already canonical), mix audio, captions → outPath. Shared by concat-and-mix and publish.
@@ -120,12 +177,13 @@ export function assemble(project, clips, settings, outPath, { captions = true, l
     if (manifest && manifest.hash !== audioHash(project)) log("⚠ audio/manifest.json is out of date (run build-audio.mjs); using it anyway");
     if (!manifest && hasLines) log("⚠ no voice-over yet (build-audio.mjs not run): output has music/silence only");
     if (manifest?.duration && Math.abs(manifest.duration - dur) > 0.15) log(`⚠ audio timeline ${manifest.duration}s vs video ${dur.toFixed(2)}s: re-run build-audio.mjs after changing scenes`);
-    const mix = buildMix(project, manifest, dur, tmp);
+    const mix = buildMix(project, manifest, dur, tmp, log);
 
     mkdirSync(join(outPath, ".."), { recursive: true });
     const srt = manifest?.captions ? join(project.root, manifest.captions) : null;
-    const cap = project.brand?.captions ?? {};
-    const capMode = captions && srt && existsSync(srt) && cap.enabled !== false ? cap.mode ?? "burn" : "none";
+    const wanted = captions ? captionMode(project, { libass: hasLibass(), warn: log }) : "none";
+    if (wanted !== "none" && !(srt && existsSync(srt))) log(`⚠ captions: ${wanted} requested but there is no captions.srt yet (run build-audio.mjs)`);
+    const capMode = srt && existsSync(srt) ? wanted : "none";
     const args = ["-y", "-v", "error", "-i", video, "-i", mix.file];
     if (capMode === "burn") {
       const fonts = join(project.root, "assets", "fonts");
@@ -137,13 +195,17 @@ export function assemble(project, clips, settings, outPath, { captions = true, l
     } else {
       args.push("-map", "0:v", "-map", "1:a", "-c:v", "copy");
     }
-    args.push("-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-shortest", "-movflags", "+faststart", `${outPath}.part.mp4`);
+    // Not -shortest: with a muxed subtitle track it cuts the video at the last caption.
+    args.push("-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-t", String(dur), "-movflags", "+faststart", `${outPath}.part.mp4`);
     run("ffmpeg", args);
     copyFileSync(`${outPath}.part.mp4`, outPath);
     rmSync(`${outPath}.part.mp4`);
-    if (srt && existsSync(srt)) copyFileSync(srt, outPath.replace(/\.mp4$/, ".srt"));
+    // The .srt travels with the video unless the user chose no captions (a stale one is removed).
+    const sideSrt = outPath.replace(/\.mp4$/, ".srt");
+    if (capMode !== "none") copyFileSync(srt, sideSrt);
+    else rmSync(sideSrt, { force: true });
     const final = probe(outPath);
-    return { out: outPath, duration: final.duration, video: final.video, audio: final.audio, lufs: mix.silent ? null : integratedLufs(outPath), captions: capMode, audioHash: manifest?.hash ?? null };
+    return { out: outPath, duration: final.duration, video: final.video, audio: final.audio, lufs: mix.silent ? null : integratedLufs(outPath), captions: capMode, sfx: mix.sfx, audioHash: manifest?.hash ?? null };
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
@@ -177,7 +239,7 @@ if (isMain(import.meta.url)) {
     }
     const r = concatAndMix(dir, { mode: args.preview ? "preview" : "final", captions: !args["no-captions"], log: console.log });
     console.log(`✓ ${r.out}`);
-    console.log(`  ${r.scenes} scenes, ${r.duration.toFixed(2)}s, ${r.video.width}x${r.video.height}@${r.video.fps}, captions: ${r.captions}${r.lufs != null ? `, loudness ${r.lufs} LUFS` : ""}`);
+    console.log(`  ${r.scenes} scenes, ${r.duration.toFixed(2)}s, ${r.video.width}x${r.video.height}@${r.video.fps}, captions: ${r.captions}${r.sfx ? `, ${r.sfx} sfx` : ""}${r.lufs != null ? `, loudness ${r.lufs} LUFS` : ""}`);
   } catch (err) {
     console.error(err.message);
     process.exit(1);

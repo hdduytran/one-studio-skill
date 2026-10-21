@@ -25,12 +25,13 @@ const hf = (project, args) => run(npx, ["--yes", `hyperframes@${hfVersion(projec
 
 // snapshot only accepts a project folder, so each scene is staged as its own index.html
 // with assets/ linked back to the project.
-function stageScene(project, id) {
-  const stage = join(project.root, ".one-studio", "stage", id);
+// `root` may be an aspect-ratio variant folder (lib/variants.mjs) with resized scenes.
+function stageScene(project, id, { root = project.root, tag = id } = {}) {
+  const stage = join(project.root, ".one-studio", "stage", tag);
   rmSync(stage, { recursive: true, force: true });
   mkdirSync(stage, { recursive: true });
-  symlinkSync(join(project.root, "assets"), join(stage, "assets"), "dir");
-  const html = readFileSync(join(project.root, "scenes", `${id}.html`), "utf8").replace(/(["'(])\.\.\/assets\//g, "$1./assets/");
+  symlinkSync(join(root, "assets"), join(stage, "assets"), "dir");
+  const html = readFileSync(join(root, "scenes", `${id}.html`), "utf8").replace(/(["'(])\.\.\/assets\//g, "$1./assets/");
   writeFileSync(join(stage, "index.html"), html);
   return stage;
 }
@@ -39,8 +40,8 @@ const hyperframes = {
   render(project, scene, rawOut, { mode, root = project.root }) {
     hf(project, ["render", root, "-c", `scenes/${scene.id}.html`, "-o", rawOut, "--quality", mode === "preview" ? "draft" : "delivery", "--fps", String(project.studio.format.fps), "--quiet"]);
   },
-  stills(project, scene, times, outDir) {
-    const stage = stageScene(project, scene.id);
+  stills(project, scene, times, outDir, { root, tag } = {}) {
+    const stage = stageScene(project, scene.id, { root, tag });
     rmSync(outDir, { recursive: true, force: true });
     hf(project, ["snapshot", stage, "--at", times.join(","), "--no-end", "-o", outDir, "--describe", "false"]);
     return readdirSync(outDir).filter((f) => f.endsWith(".png")).sort().map((f) => join(outDir, f));
@@ -65,9 +66,9 @@ const lemo = {
     const { width, height } = size ?? project.studio.format;
     runIn(lib, "node", ["core/render/video.mjs", join(project.root, "scenes", scene.id), "--fps", String(fps), "--size", `${width}x${height}`, "--out", rawOut]);
   },
-  stills(project, scene, times, outDir) {
+  stills(project, scene, times, outDir, { size } = {}) {
     const lib = requireLemo();
-    const { width, height } = project.studio.format;
+    const { width, height } = size ?? project.studio.format;
     rmSync(outDir, { recursive: true, force: true });
     mkdirSync(outDir, { recursive: true });
     runIn(lib, "node", ["core/render/still.mjs", join(project.root, "scenes", scene.id), ...times.map(String), "--size", `${width}x${height}`, "--out", outDir]);

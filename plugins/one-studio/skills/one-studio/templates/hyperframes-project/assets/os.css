@@ -1,4 +1,4 @@
-/* one-studio scene base styles v1. Uses brand.css variables only; never hard-code colours or fonts. */
+/* one-studio scene base styles v2. Uses brand.css variables only; never hard-code colours or fonts. */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { margin: 0; overflow: hidden; background: var(--c-bg); }
 
@@ -52,7 +52,8 @@ html, body { margin: 0; overflow: hidden; background: var(--c-bg); }
 .os-muted { color: var(--c-muted); }
 .os-word { display: inline-block; white-space: pre; }
 
-.os-card {
+/* .os-glass = .os-card; with brand.surface "glass" both become frosted glass (brand.css). */
+.os-card, .os-glass {
   background: color-mix(in srgb, var(--c-fg) 6%, transparent);
   border: calc(2 * var(--u)) solid color-mix(in srgb, var(--c-fg) 14%, transparent);
   border-radius: calc(var(--grid-unit) * 3 * var(--u));

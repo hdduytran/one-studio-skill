@@ -29,6 +29,24 @@ export function probe(path) {
 
 export const duration = (path) => probe(path).duration;
 
+// Filters this FFmpeg build has. Homebrew FFmpeg 8 ships without freetype (no drawtext) and some
+// builds lack libass (no subtitles), so every use of those filters checks first and falls back.
+let filterCache = null;
+export function ffmpegFilters() {
+  if (filterCache) return filterCache;
+  try {
+    const out = execFileSync("ffmpeg", ["-hide_banner", "-filters"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+    filterCache = new Set(out.split("\n").map((l) => /^\s*[A-Z.|]{2,3}\s+(\w+)\s/.exec(l)?.[1]).filter(Boolean));
+  } catch {
+    filterCache = new Set();
+  }
+  return filterCache;
+}
+export const hasFilter = (name) => ffmpegFilters().has(name);
+export const hasDrawtext = () => hasFilter("drawtext");
+// Burned captions need libass, exposed as the `subtitles` filter.
+export const hasLibass = () => hasFilter("subtitles");
+
 // Canonical encode. mode "final": full size, CRF from studio.render.crf. mode "preview": scaled down, fast.
 export function encodeSettings(studio, mode = "final") {
   const { width, height, fps } = studio.format;

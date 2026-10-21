@@ -36,7 +36,8 @@ export function variantRoot(project, aspect) {
   return root;
 }
 
-export const variantHash = (project, scene, aspect) => sha256(`${sceneHash(project, scene)}|${aspect}`).slice(0, 12);
+// The scene as seen by that ratio: its own <style data-ratio="…"> blocks count, the main ratio's do not.
+export const variantHash = (project, scene, aspect) => sha256(`${sceneHash(project, scene, { aspect })}|${aspect}`).slice(0, 12);
 
 // Fallback for engines that cannot re-layout (Remotion): fit the main clip into the new frame
 // over a blurred, darkened copy of itself.

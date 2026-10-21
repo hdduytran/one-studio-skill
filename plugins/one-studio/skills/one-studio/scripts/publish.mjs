@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 // Gate 10: deliver. Extra aspect ratios (studio.json → format.exports or --ratios), a thumbnail per
 // ratio, a contact sheet per extra ratio, and out/manifest.json describing everything delivered.
-//   node publish.mjs <project-dir> [--ratios 9:16,1:1] [--thumb-title "…"] [--thumb-subtitle "…"] [--no-thumbnail]
+//   node publish.mjs <project-dir> [--ratios 9:16,1:1] [--thumb-frame <scene>@<seconds>] [--thumb-title "…"]
+//        [--thumb-subtitle "…"] [--no-thumbnail]
+// --thumb-frame uses a frame of that scene (scene-relative time) from each ratio's own clip; add
+// --thumb-title to lay the brand title card over it. Without it, the thumbnail is the brand title card.
 // Extra ratios re-render scenes from the same sources at the new size (cached per scene and ratio);
 // Remotion scenes are fitted from their main clip. Audio and captions are shared with the main video.
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { ASPECTS, GATES, TEMPLATE_DIR, fileHash, isMain, loadProject, now, parseArgs, sceneEngine } from "./lib/project.mjs";
 import { gateInputHash, gateProblems, outputPath } from "./lib/gates.mjs";
@@ -47,7 +50,25 @@ function renderVariant(project, aspect, log) {
   return { clips, settings, dir };
 }
 
-function thumbnail(project, aspect, { title, subtitle }, outFile) {
+// "s02@3.5" (or with a full-width ＠) → { id, t }
+export function parseThumbFrame(spec, project) {
+  const m = /^([a-z0-9][a-z0-9-]*)\s*[@＠]\s*(\d+(?:\.\d+)?)s?$/.exec(String(spec).trim());
+  if (!m) throw new Error(`--thumb-frame must look like s02@3.5 (scene id @ seconds into the scene), got "${spec}"`);
+  const scene = project.storyboard?.scenes?.find((s) => s.id === m[1]);
+  if (!scene) throw new Error(`--thumb-frame: scene ${m[1]} is not in storyboard.json`);
+  return { id: m[1], t: Number(m[2]) };
+}
+
+// One frame of a clip as PNG (time clamped inside the clip).
+function grabFrame(clip, t, out) {
+  const d = probe(clip).duration;
+  const at = Math.max(0, Math.min(t, d - 0.05));
+  mkdirSync(join(out, ".."), { recursive: true });
+  run("ffmpeg", ["-y", "-v", "error", "-ss", String(at), "-i", clip, "-frames:v", "1", out]);
+  return out;
+}
+
+function thumbnail(project, aspect, { title, subtitle, frame = null }, outFile) {
   const size = ASPECTS[aspect];
   const stage = join(project.root, ".one-studio", "stage", `thumb-${ratioTag(aspect)}`);
   rmSync(stage, { recursive: true, force: true });
@@ -56,7 +77,13 @@ function thumbnail(project, aspect, { title, subtitle }, outFile) {
   const head = readFileSync(join(TEMPLATE_DIR, "scenes", "_head.html"), "utf8");
   const body = readFileSync(join(TEMPLATE_DIR, "scenes", "thumbnail.html"), "utf8");
   const logo = existsSync(join(project.root, "assets", "brand", "logo.svg")) ? '<img class="os-logo-corner" src="../assets/brand/logo.svg" />' : "";
-  const vars = { id: "thumb", type: "thumbnail", lang: project.studio.meta.language, ...size, duration: 2, transition_in: "cut", transition_out: "cut", transition_duration: 0, headline: escapeHtml(title), subline: escapeHtml(subtitle ?? ""), logo, extra_head: "" };
+  let background = "";
+  if (frame) {
+    copyFileSync(frame, join(stage, "frame.png"));
+    // video frame + a scrim from the bottom so the title stays readable
+    background = '<img class="os-bg" src="./frame.png" style="width: 100%; height: 100%; object-fit: cover" /><div class="os-bg" style="background: linear-gradient(to top, color-mix(in srgb, var(--c-bg) 94%, transparent) 0%, color-mix(in srgb, var(--c-bg) 70%, transparent) 45%, transparent 80%)"></div>';
+  }
+  const vars = { id: "thumb", type: "thumbnail", lang: project.studio.meta.language, ...size, duration: 2, transition_in: "cut", transition_out: "cut", transition_duration: 0, headline: escapeHtml(title), subline: escapeHtml(subtitle ?? ""), logo, background, extra_head: "" };
   const html = (head + body).replace(/\{\{(\w+)\}\}/g, (m, k) => (k in vars ? String(vars[k]) : m)).replace(/(["'(])\.\.\/assets\//g, "$1./assets/");
   writeFileSync(join(stage, "index.html"), html);
   const shots = join(stage, "shots");
@@ -85,7 +112,7 @@ function sheetFromClips(clips, ids, out) {
   return out;
 }
 
-export function publish(dir, { ratios = null, thumb = true, title = null, subtitle = null, log = () => {} } = {}) {
+export function publish(dir, { ratios = null, thumb = true, title = null, subtitle = null, thumbFrame = null, log = () => {} } = {}) {
   const project = loadProject(dir);
   const renderGate = GATES.find((g) => g.id === "render");
   const problems = gateProblems(project, renderGate);
@@ -96,6 +123,9 @@ export function publish(dir, { ratios = null, thumb = true, title = null, subtit
   const name = project.studio.meta.name;
   const outDir = join(project.root, project.studio.render?.out_dir ?? "out");
   const deliverables = [];
+  const frameSpec = thumb && thumbFrame ? parseThumbFrame(thumbFrame, project) : null;
+  const sceneIds = (project.storyboard?.scenes ?? []).map((s) => s.id);
+  const clipsByAspect = { [main]: planRender(project, { mode: "final" }).map((p) => join(project.root, p.clip)) };
 
   const mainFile = outputPath(project, "final");
   const mp = probe(mainFile);
@@ -105,6 +135,7 @@ export function publish(dir, { ratios = null, thumb = true, title = null, subtit
 
   for (const aspect of wanted) {
     const { clips, settings, dir: clipDir } = renderVariant(project, aspect, log);
+    clipsByAspect[aspect] = clips;
     const out = join(outDir, `${name}-${ratioTag(aspect)}.mp4`);
     const r = assemble(project, clips, settings, out, { log });
     const sheet = sheetFromClips(clips, (project.storyboard?.scenes ?? []).map((s) => s.id), join(clipDir, "..", "sheet.jpg"));
@@ -116,9 +147,19 @@ export function publish(dir, { ratios = null, thumb = true, title = null, subtit
   if (thumb) {
     const series = project.studio.meta.series ? `${project.studio.meta.series}${project.studio.meta.episode ? ` · tập ${project.studio.meta.episode}` : ""}` : "";
     for (const aspect of [main, ...wanted]) {
-      const f = thumbnail(project, aspect, { title: title ?? project.studio.meta.title ?? name, subtitle: subtitle ?? series }, join(outDir, `${name}-thumb-${ratioTag(aspect)}.jpg`));
-      thumbs.push({ aspect, path: relative(project.root, f) });
-      log(`✓ thumbnail ${aspect}`);
+      const out = join(outDir, `${name}-thumb-${ratioTag(aspect)}.jpg`);
+      let frame = null;
+      if (frameSpec) {
+        const clip = clipsByAspect[aspect][sceneIds.indexOf(frameSpec.id)];
+        frame = grabFrame(clip, frameSpec.t, join(project.root, ".one-studio", "stage", `thumb-frame-${ratioTag(aspect)}.png`));
+      }
+      if (frame && !title) {
+        // the frame itself, nothing laid over it
+        run("ffmpeg", ["-y", "-v", "error", "-i", frame, "-vf", `scale='min(1920,iw)':-2`, "-q:v", "2", out]);
+      } else thumbnail(project, aspect, { title: title ?? project.studio.meta.title ?? name, subtitle: subtitle ?? series, frame }, out);
+      if (frame) rmSync(frame, { force: true });
+      thumbs.push({ aspect, path: relative(project.root, out), ...(frameSpec && { frame: `${frameSpec.id}@${frameSpec.t}` }) });
+      log(`✓ thumbnail ${aspect}${frameSpec ? ` (frame ${frameSpec.id}@${frameSpec.t}s)` : ""}`);
     }
   }
 
@@ -136,7 +177,8 @@ export function publish(dir, { ratios = null, thumb = true, title = null, subtit
     published: now(),
     videos: deliverables,
     thumbnails: thumbs,
-    captions: existsSync(mainFile.replace(/\.mp4$/, ".srt")) ? relative(project.root, mainFile.replace(/\.mp4$/, ".srt")) : null,
+    captions: mainInfo.captions !== "none" && existsSync(mainFile.replace(/\.mp4$/, ".srt")) ? relative(project.root, mainFile.replace(/\.mp4$/, ".srt")) : null,
+    captions_mode: mainInfo.captions ?? null,
     scenes: (mainInfo.scenes ?? []).map(({ id, hash }) => ({ id, hash })),
     audio: mainInfo.audio ?? null,
   };
@@ -150,10 +192,10 @@ export function publish(dir, { ratios = null, thumb = true, title = null, subtit
 
 if (isMain(import.meta.url)) {
   try {
-    const args = parseArgs(process.argv.slice(2), { flags: ["no-thumbnail", "help"], options: ["ratios", "thumb-title", "thumb-subtitle"] });
+    const args = parseArgs(process.argv.slice(2), { flags: ["no-thumbnail", "help"], options: ["ratios", "thumb-title", "thumb-subtitle", "thumb-frame"] });
     const dir = args._[0];
     if (args.help || !dir) {
-      console.log('usage: publish.mjs <project-dir> [--ratios 9:16,1:1] [--thumb-title "…"] [--thumb-subtitle "…"] [--no-thumbnail]');
+      console.log('usage: publish.mjs <project-dir> [--ratios 9:16,1:1] [--thumb-frame <scene>@<s>] [--thumb-title "…"] [--thumb-subtitle "…"] [--no-thumbnail]');
       process.exit(dir ? 0 : 1);
     }
     const r = publish(dir, {
@@ -161,6 +203,7 @@ if (isMain(import.meta.url)) {
       thumb: !args["no-thumbnail"],
       title: args["thumb-title"],
       subtitle: args["thumb-subtitle"],
+      thumbFrame: args["thumb-frame"],
       log: console.log,
     });
     console.log(`✓ ${r.manifestPath}`);

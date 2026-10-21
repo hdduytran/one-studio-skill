@@ -9,11 +9,20 @@ Marks printed by status: `✓` done · `→` current · `!` input changed after 
 ## 0 · Setup
 
 - **In:** the user's request.
-- **Ask (one message, only missing items):** new video or series episode · 2D/3D/mixed · aspect + length · VO language · brand (colours, fonts, logo or defaults) · allowed services.
-- **Do:** `node "$S/scripts/init-project.mjs" D --title "…" --lang <code> --dimension <2d|3d|mixed> --aspect <ratio> --duration <s> [--series <name>] [--series-root <dir>]`.
-  - With `--series`, brand lives at `<series-root>/<name>/brand/brand.json` (default series root `D/../series`). If it exists it is reused: **do not ask brand questions**.
+- **Ask (one message, only missing items):** new video or series episode · 2D/3D/mixed · aspect + length (+ other ratios to publish) · VO language · look (brand colours/fonts/logo, a preset, or defaults) · **captions** · allowed services. Vietnamese example:
+  > Mình cần vài thông tin trước khi bắt đầu:
+  > 1. Video mới hay tập tiếp theo của series nào?
+  > 2. 2D, 3D hay kết hợp? Tỉ lệ khung (16:9, 9:16, 1:1) và độ dài? Có cần xuất thêm tỉ lệ khác không?
+  > 3. Giọng đọc tiếng Việt qua ZeroTTS ở `http://localhost:8000` đúng không?
+  > 4. Màu/phông/logo riêng, hay chọn một mẫu: `apple-light`, `apple-keynote`, `neon-terminal`, `synthwave`, `ocean-calm`, `warm-editorial`, `swiss-mono`, `default`? (mình có thể dựng bảng so sánh)
+  > 5. Phụ đề: **không** · **chỉ file .srt** · **phụ đề mềm** (bật/tắt được, kèm .srt) · **in cứng vào hình**?
+  > 6. Được dùng dịch vụ trả phí / từ xa nào không? (mặc định: không)
+- **Do:** `node "$S/scripts/init-project.mjs" D --title "…" --lang <code> --dimension <2d|3d|mixed> --aspect <ratio> --duration <s> [--exports 16:9,9:16] [--preset <name>] [--captions none|sidecar|mux|burn] [--tts-url <url>] [--probe-tts] [--series <name>] [--series-root <dir>]`.
+  - With `--series`, brand lives at `<series-root>/<name>/brand/brand.json` (default series root `D/../series`). If it exists it is reused: **do not ask brand questions**; the captions answer then goes to `studio.json → captions`.
+  - Unsure about the look → after scenes exist, `compare-presets.mjs D` renders the same scenes in every preset (`review/presets.jpg`); `--apply <preset>` sets it. Presets `apple-light` and `synthwave` use the glass surface (`brand.json → surface: "glass"`).
   - Write the user's brand answers into `brand.json` (keep `version: 1` for a new kit).
-  - Write the confirmed TTS endpoint into `studio.json → audio.tts.<lang>` (`base_url`, `model`, `voice`) and set `services.tts: true` once the user agrees to calls. Keys stay in env (`ONE_STUDIO_TTS_KEY_VI`, `ONE_STUDIO_TTS_KEY`).
+  - Captions answer → `--captions` (mapping in `references/audio-tts.md`). Init warns when FFmpeg has no libass: `burn` becomes `mux`; tell the user.
+  - Voice: `--probe-tts` lists the server's voices (no synthesis). The init placeholder `default` is not a real voice: offer samples (`tts-openai-compatible.mjs D --samples all --allow-tts` after a yes) and `audio-picker.mjs D`, then `--use-voice <id>`. Set `services.tts: true` once the user agrees to calls. Keys stay in env (`ONE_STUDIO_TTS_KEY_VI`, `ONE_STUDIO_TTS_KEY`).
 - **Close:** init marks setup done.
 
 ## 1 · Brief
@@ -50,8 +59,10 @@ Marks printed by status: `✓` done · `→` current · `!` input changed after 
 
 ## 5 · Keyframe review — approval per scene
 
-- **Do:** `prepare-project.mjs D` (runtime, fonts, brand CSS, vendored libs) → `new-scene.mjs D --all` (templates per type; lemo scenes get a folder; Remotion scenes: `new-remotion.mjs D`) → write each scene (read its type reference first) → `keyframe-stills.mjs D` (only changed/unapproved scenes) → look at `review/sheet.jpg` yourself, fix, re-run for those ids.
-- **Ask:** show the sheet path (and the image if the client can display it), list scenes you are unsure about: "Bạn duyệt các scene này chứ? Scene nào cần sửa?"
+- **Do:** `prepare-project.mjs D` (runtime, fonts, brand CSS, vendored libs, preview SFX cues) → `new-scene.mjs D --all` (templates per type; lemo scenes get a folder; Remotion scenes: `new-remotion.mjs D`) → write each scene (read its type reference first) → `keyframe-stills.mjs D` (only changed/unapproved scenes) → look at `review/sheet.jpg` yourself, fix, re-run for those ids.
+  - Other ratios in `format.exports` are captured too (one middle frame per scene → `review/sheet-<ratio>.jpg`). Fix portrait/square layout now with `<style data-ratio="9:16">` blocks: they are hashed for that ratio only, so the main-ratio approval and clips stay valid. These sheets are for review; approval follows the main ratio.
+  - Without FFmpeg drawtext the sheets have no labels: rows/tiles are in storyboard order; say so when you show them.
+- **Ask:** show the sheet path(s) (and the images if the client can display them), list scenes you are unsure about: "Bạn duyệt các scene này chứ? Scene nào cần sửa? (bản dọc 9:16 ở `review/sheet-9x16.jpg`)"
 - **Close:** `status.mjs D --approve-scenes s01,s02` for the approved ones (or `all`), then `--approve keyframes` once every scene is approved. A later edit to a scene clears only its approval.
 
 ## 6 · Build
@@ -61,10 +72,12 @@ Marks printed by status: `✓` done · `→` current · `!` input changed after 
 
 ## 7 · Audio
 
+- **Music** (when `studio.json → audio.music` is `null`): `make-music.mjs D --samples` → `audio-picker.mjs D` → show `review/audio-picker.html` (and the `review/music/*.m4a` paths). Ask: "Bạn chọn nhạc nền nào: ambient, ambient-bright, lofi, lofi-dark, file của bạn, hay không nhạc?" → `make-music.mjs D --use <bed|path|none>`.
+- **Captions** (re-ask only if the user wants to change the gate 0 answer): "Giữ phụ đề <mode> chứ?" → `status.mjs D --captions <mode>`.
+- **SFX** (optional): add `scenes[].sfx[]` cues to the storyboard (`references/audio-tts.md`); the picker page lists the built-in kit.
 - `build-audio.mjs D --dry-run` → number of TTS calls. If `services.tts` is not true, ask once; then `build-audio.mjs D --allow-tts`.
-- It fits scene lengths to the VO (keeps approvals), writes `audio/vo.wav`, `captions.srt`, `audio/manifest.json`. If scenes got longer, re-run gate 6 for them (`render-changed-scenes --preview`).
-- Optional: sync on-screen reveals to `audio/manifest.json → scenes[].lines[].start`, re-run stills for the scenes you touched.
-- **Close:** `--approve audio`.
+- It fits scene lengths to the VO and writes `data-line` reveal timings into scenes that use them (approvals kept, gates 5–6 stay ✓), writes `audio/vo.wav`, `captions.srt` (unless captions are `none`), `audio/manifest.json`. Scenes it changed re-render at gate 8 (`render-changed-scenes --preview`).
+- **Close:** `--approve audio` (refuses while music is undecided or the audio is stale).
 
 ## 8 · Preview — approval
 
@@ -79,7 +92,7 @@ Marks printed by status: `✓` done · `→` current · `!` input changed after 
 
 ## 10 · Publish
 
-- `publish.mjs D` → extra ratios from `format.exports`, thumbnails, `out/manifest.json` (see `references/series-publish.md`). Look at each `out/<ratio>/sheet.jpg`.
+- `publish.mjs D [--thumb-frame <scene>@<s>] [--thumb-title "…"]` → extra ratios from `format.exports`, thumbnails, `out/manifest.json` (see `references/series-publish.md`). Look at each `out/<ratio>/sheet.jpg`. Offer a frame thumbnail: "Ảnh bìa lấy khung hình nào? (vd. s02 giây 3.5)".
 - **Close:** `--approve publish`, tell the user the output paths. For a series, offer `series-bumper.mjs` if the intro/outro should be reused.
 
 ---
@@ -92,3 +105,8 @@ Marks printed by status: `✓` done · `→` current · `!` input changed after 
 | Add / remove a scene | edit script + storyboard (new id, never reuse an old id) | script, storyboard, estimate; only the new scene builds |
 | Change brand | edit `brand.json`, bump `version` | every scene's hash → say how many scenes re-render, ask first |
 | Change aspect ratio | add to `format.exports` (publish) rather than changing `format.aspect` | publish only |
+| Fix a scene in one export ratio | `<style data-ratio="9:16">` block in that scene, `keyframe-stills.mjs D <id> --ratios 9:16` | that ratio's clip only (main approval and clip kept) |
+| Change captions | `status.mjs D --captions <mode>`, `build-audio.mjs` | audio, preview, render, publish |
+| Change music / SFX | `make-music.mjs D --use …` / edit `scenes[].sfx[]` | audio (+ storyboard for cues), preview, render, publish — no scene re-renders |
+| Change the voice | `tts-openai-compatible.mjs D --use-voice <id>` | audio (every sentence re-synthesised: ask first) |
+| Change the look to a preset | `compare-presets.mjs D`, then `--apply <preset>` | brand version → every scene (ask first) |

@@ -9,6 +9,11 @@
 <script src="../assets/vendor/gsap.min.js"></script>
 <script src="../assets/brand.js"></script>
 <script src="../assets/os.js"></script>
+<style data-ratio="9:16">
+  /* Portrait only: hashed for 9:16 alone, so tuning it never re-opens the 16:9 approval or clip. */
+  #root .os-h2 { font-size: calc(var(--fs-h1) * var(--u)); text-align: center; }
+  #root .os-diagram { max-height: none; height: auto; }
+</style>
 </head>
 <body>
 <div id="root" class="os-scene" data-composition-id="s02" data-start="0" data-duration="10" data-width="1920" data-height="1080"

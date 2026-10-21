@@ -1,0 +1,52 @@
+{
+  "default": {
+    "about": "Dark slate, blue + amber. The one-studio default.",
+    "surface": "flat",
+    "colors": { "bg": "#0b0d12", "fg": "#f4f5f7", "primary": "#4f7cff", "secondary": "#22c3a6", "accent": "#ffb547", "muted": "#8a90a0" }
+  },
+  "apple-light": {
+    "about": "Apple light: near-white, system blue, macOS frosted-glass cards.",
+    "surface": "glass",
+    "colors": { "bg": "#fbfbfd", "fg": "#1d1d1f", "primary": "#0071e3", "secondary": "#34c759", "accent": "#bf4800", "muted": "#86868b" }
+  },
+  "apple-keynote": {
+    "about": "Keynote stage: black, bright system colours.",
+    "surface": "flat",
+    "colors": { "bg": "#000000", "fg": "#f5f5f7", "primary": "#2997ff", "secondary": "#30d158", "accent": "#ff9f0a", "muted": "#86868b" }
+  },
+  "neon-terminal": {
+    "about": "Terminal green on near-black, monospace headings.",
+    "surface": "flat",
+    "colors": { "bg": "#070b08", "fg": "#d9ffe0", "primary": "#39ff7a", "secondary": "#00e5ff", "accent": "#ff3fd8", "muted": "#5f8068" },
+    "typography": {
+      "heading": { "family": "JetBrains Mono", "weight": 700, "fontsource": "jetbrains-mono@5.3.0", "fallback": "ui-monospace, monospace" },
+      "mono": { "family": "JetBrains Mono", "weight": 500, "fontsource": "jetbrains-mono@5.3.0", "fallback": "ui-monospace, monospace" }
+    }
+  },
+  "synthwave": {
+    "about": "Deep purple night, hot pink + cyan, glass panels.",
+    "surface": "glass",
+    "colors": { "bg": "#1a1033", "fg": "#fdf6ff", "primary": "#ff2a6d", "secondary": "#05d9e8", "accent": "#f9c80e", "muted": "#9a86c4" }
+  },
+  "ocean-calm": {
+    "about": "Pale sea-mist background, teal and coral.",
+    "surface": "flat",
+    "colors": { "bg": "#f2f7f8", "fg": "#0f2a35", "primary": "#1b7f99", "secondary": "#3fb8af", "accent": "#ff8c61", "muted": "#6b8a94" }
+  },
+  "warm-editorial": {
+    "about": "Paper cream, rust and ochre, serif headings (Fraunces).",
+    "surface": "flat",
+    "colors": { "bg": "#f6f1e7", "fg": "#2b2118", "primary": "#b4502d", "secondary": "#6d8a5e", "accent": "#d9a441", "muted": "#8c7b69" },
+    "typography": {
+      "heading": { "family": "Fraunces", "weight": 700, "fontsource": "fraunces@5.3.0", "fallback": "Georgia, serif" }
+    }
+  },
+  "swiss-mono": {
+    "about": "Swiss poster: white, black, one red. Heavy grotesk.",
+    "surface": "flat",
+    "colors": { "bg": "#ffffff", "fg": "#111111", "primary": "#111111", "secondary": "#6b6b6b", "accent": "#e30613", "muted": "#8a8a8a" },
+    "typography": {
+      "heading": { "family": "Inter", "weight": 800, "fontsource": "inter@5.2.8", "fallback": "Helvetica, Arial, sans-serif" }
+    }
+  }
+}

@@ -19,7 +19,8 @@
     "fps": 30,
     "target_duration": 40,
     "exports": [
-      "16:9"
+      "16:9",
+      "9:16"
     ]
   },
   "engine": {
@@ -52,13 +53,13 @@
     },
     "storyboard": {
       "done": true,
-      "at": "2026-10-21T05:41:52.294Z",
-      "hash": "41cba190c9b89a1c3750c675b04ccd9fecbbbcb73d93497d03bdf9200df5fcf9"
+      "at": "2026-10-21T13:39:54.866Z",
+      "hash": "ea9ec1fbe9a94e5c83e65cda642f67225498b5dab297c6401a457067de70c798"
     },
     "estimate": {
       "done": true,
-      "at": "2026-10-21T05:41:52.344Z",
-      "hash": "41cba190c9b89a1c3750c675b04ccd9fecbbbcb73d93497d03bdf9200df5fcf9"
+      "at": "2026-10-21T13:39:54.937Z",
+      "hash": "ea9ec1fbe9a94e5c83e65cda642f67225498b5dab297c6401a457067de70c798"
     }
   },
   "scenes": [
@@ -113,7 +114,7 @@
       }
     },
     "music": null,
-    "sfx": false,
+    "sfx": true,
     "loudness": -14,
     "sentence_pause": 0.25,
     "scene_padding": 0.5

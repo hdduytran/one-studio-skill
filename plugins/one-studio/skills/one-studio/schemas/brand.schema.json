@@ -56,6 +56,17 @@
         }
       }
     },
+    "surface": {
+      "enum": [
+        "flat",
+        "glass"
+      ],
+      "description": "Card/background look generated into assets/brand.css: flat (default) or glass (macOS-style frosted cards over brand-colour glows)."
+    },
+    "preset": {
+      "type": "string",
+      "description": "Preset this kit started from (templates/brand-presets.json); informational."
+    },
     "typography": {
       "type": "object",
       "required": [
@@ -207,13 +218,15 @@
       "additionalProperties": false,
       "properties": {
         "enabled": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "false = no captions (same as mode none)."
         },
         "mode": {
           "enum": [
-            "burn",
+            "none",
+            "sidecar",
             "mux",
-            "sidecar"
+            "burn"
           ]
         },
         "font": {
@@ -240,7 +253,8 @@
           "type": "integer",
           "minimum": 10
         }
-      }
+      },
+      "description": "Gate 0 question (re-askable at gate 7): none | sidecar (.srt only) | mux (soft track + .srt) | burn (in picture, needs libass; falls back to mux). studio.json → captions overrides it per project."
     },
     "lower_third": {
       "type": "object",

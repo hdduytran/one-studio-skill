@@ -49,7 +49,7 @@ test("(a)(b)(d)(e) 2D Vietnamese video through every gate, then add one scene", 
     await ok("init-project.mjs", dir, "--title", "E2E", "--lang", "vi", "--duration", "8");
     const st = readJson(join(dir, "studio.json"));
     st.audio.tts.vi.base_url = mock.url;
-    st.audio.music = null;
+    st.audio.music = false; // gate 7 needs a music decision; false = the user chose none
     writeJson(join(dir, "studio.json"), st);
     copyFileSync("tests/fixtures/satellite.json", join(dir, "assets", "satellite.json"));
     fillMd(dir, "brief.md");

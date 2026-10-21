@@ -27,9 +27,14 @@ export function wav(seconds, { rate = 24000, lead = 0.2, tail = 0.2, freq = 220 
 
 export const speechSeconds = (text) => Math.max(0.3, text.length * 0.06);
 
-export function startMockTts({ key } = {}) {
+// voices: when given, GET /v1/audio/voices lists them and unknown voices are rejected (like ZeroTTS).
+export function startMockTts({ key, voices = null, port = 0 } = {}) {
   const calls = [];
   const server = createServer((req, res) => {
+    if (req.method === "GET" && req.url === "/v1/audio/voices" && voices) {
+      res.writeHead(200, { "content-type": "application/json" });
+      return res.end(JSON.stringify({ voices: voices.map((id) => ({ id, name: id })) }));
+    }
     if (req.method === "GET" && req.url === "/v1/models") {
       res.writeHead(200, { "content-type": "application/json" });
       return res.end(JSON.stringify({ data: [{ id: "zerotts" }, { id: "omnivoice" }] }));
@@ -43,6 +48,10 @@ export function startMockTts({ key } = {}) {
       req.on("data", (c) => (body += c));
       req.on("end", () => {
         const j = JSON.parse(body);
+        if (voices && !voices.includes(j.voice)) {
+          res.writeHead(400, { "content-type": "application/json" });
+          return res.end(JSON.stringify({ detail: `Unknown voice: ${j.voice}` }));
+        }
         calls.push(j);
         res.writeHead(200, { "content-type": "audio/wav" });
         res.end(wav(speechSeconds(j.input)));
@@ -53,12 +62,12 @@ export function startMockTts({ key } = {}) {
     res.end();
   });
   return new Promise((resolve) => {
-    server.listen(0, "127.0.0.1", () => resolve({ url: `http://127.0.0.1:${server.address().port}`, calls, close: () => server.close() }));
+    server.listen(port, "127.0.0.1", () => resolve({ url: `http://127.0.0.1:${server.address().port}`, calls, close: () => server.close() }));
   });
 }
 
-// Run standalone: node tests/mock-tts-server.mjs [port]
+// Run standalone: node tests/mock-tts-server.mjs [port]   (ZeroTTS-like voices)
 if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split("/").pop())) {
-  const { url } = await startMockTts();
+  const { url } = await startMockTts({ port: Number(process.argv[2] ?? 0), voices: ["quangminh", "tiendat", "baotrang"] });
   console.log(`mock TTS on ${url}`);
 }
