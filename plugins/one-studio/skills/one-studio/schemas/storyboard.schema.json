@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "one-studio/storyboard.schema.json",
+  "title": "one-studio storyboard",
+  "description": "Scene list in playback order. Scene ids are stable: renaming an id discards its cache.",
+  "type": "object",
+  "required": ["version", "scenes"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "integer", "minimum": 1 },
+    "scenes": { "type": "array", "items": { "$ref": "#/$defs/scene" } }
+  },
+  "$defs": {
+    "sceneType": { "enum": ["text", "diagram", "data", "lottie", "rive", "explainer", "character", "3d"] },
+    "engine": { "enum": ["hyperframes", "remotion", "lemo"] },
+    "line": {
+      "description": "One spoken sentence. One TTS call and one caption cue per line.",
+      "type": "object",
+      "required": ["id", "text"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "text": { "type": "string", "minLength": 1, "description": "Caption text (digits allowed)." },
+        "say": { "type": "string", "description": "What TTS speaks when it differs from text (numbers spelled out)." },
+        "lang": { "type": "string" },
+        "voice": { "type": "string" },
+        "pause_after": { "type": "number", "minimum": 0 }
+      }
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "enum": ["cut", "fade", "slide-left", "slide-up", "wipe", "zoom", "blur"] },
+        "duration": { "type": "number", "minimum": 0 }
+      }
+    },
+    "scene": {
+      "type": "object",
+      "required": ["id", "type", "duration"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "title": { "type": "string" },
+        "type": { "$ref": "#/$defs/sceneType" },
+        "engine": { "$ref": "#/$defs/engine", "description": "Override; default comes from the type (3d→remotion, character→lemo, else hyperframes)." },
+        "duration": { "type": "number", "exclusiveMinimum": 0, "description": "Planned seconds; extended to fit VO in phase 5." },
+        "goal": { "type": "string", "description": "What the viewer must take away from this scene." },
+        "visual": { "type": "string", "description": "What is on screen, in a sentence or two." },
+        "layout": { "type": "string" },
+        "lines": { "type": "array", "items": { "$ref": "#/$defs/line" } },
+        "assets": { "type": "array", "items": { "type": "string" }, "description": "Paths relative to the project." },
+        "transition": { "$ref": "#/$defs/transition" },
+        "notes": { "type": "string" },
+        "data": { "description": "Inline data for type=data (chart rows).", "type": ["array", "object"] },
+        "explainer": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "object": { "type": "string", "description": "The physical machine that embodies the concept." },
+            "size": { "enum": ["figure", "hero"] },
+            "theme": { "enum": ["dark", "light"] }
+          }
+        },
+        "character": {
+          "type": "object",
+          "required": ["style"],
+          "additionalProperties": false,
+          "properties": {
+            "style": { "type": "string", "pattern": "^[a-z0-9-]+$", "description": "lemo-opuscar styles/<slug>." },
+            "action": { "type": "string" }
+          }
+        },
+        "three": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "subject": { "type": "string" },
+            "camera": { "type": "string" },
+            "physics": { "type": "boolean" }
+          }
+        }
+      }
+    }
+  }
+}

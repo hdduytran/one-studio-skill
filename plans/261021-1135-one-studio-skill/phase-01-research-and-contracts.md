@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: Research & contracts
-status: pending
+status: done
 depends_on: []
 ---
 
@@ -30,3 +30,9 @@ Chốt các hợp đồng dữ liệu (schema) và cách gọi từng phụ thu�
 
 ## Rủi ro
 - Lệnh CLI HyperFrames khác giả định → cập nhật phase 3 trước khi code.
+
+## Kết quả (2026-10-21)
+- Report: `plans/reports/researcher-261021-dependencies.md` (HyperFrames đã chạy thật: render + snapshot; anatomy, lemo đọc từ source).
+- 3 schema + `validate.mjs` (không phụ thuộc ngoài) pass trên `examples/demo/`.
+- **Pending cho user:** gọi thử ZeroTTS / OmniVoice `/v1/audio/speech` trên máy local (server local không truy cập được từ cloud) — checklist ở mục 5 của report.
+- Ảnh hưởng tới phase sau: GSAP phải nạp local (`assets/vendor/gsap.min.js`), CDN làm hỏng render; `snapshot` chỉ nhận thư mục project → phase 4 dựng thư mục review tạm cho từng scene; render từng scene bằng `render -c scenes/<id>.html` chạy được.

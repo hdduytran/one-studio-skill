@@ -1,0 +1,9 @@
+{
+  "name": "one-studio",
+  "version": "0.1.0",
+  "description": "Guided motion-video pipeline: brief → script → storyboard → keyframe review → per-scene incremental render → TTS/captions → publish. HyperFrames for 2D, Remotion for 3D, anatomy and lemo-opuscar for special scenes.",
+  "author": { "name": "hdduytran", "url": "https://github.com/hdduytran" },
+  "repository": "https://github.com/hdduytran/one-studio-skill",
+  "license": "MIT",
+  "keywords": ["video", "motion", "hyperframes", "remotion", "gsap", "tts", "ffmpeg"]
+}

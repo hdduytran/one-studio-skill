@@ -1,0 +1,37 @@
+{
+  "name": "{{name}}",
+  "version": 1,
+  "colors": {
+    "bg": "#0b0d12",
+    "fg": "#f4f5f7",
+    "primary": "#4f7cff",
+    "secondary": "#22c3a6",
+    "accent": "#ffb547",
+    "muted": "#8a90a0"
+  },
+  "typography": {
+    "heading": { "family": "Inter", "weight": 700, "fallback": "system-ui, sans-serif" },
+    "body": { "family": "Inter", "weight": 400, "fallback": "system-ui, sans-serif" },
+    "mono": { "family": "JetBrains Mono", "weight": 500, "fallback": "ui-monospace, monospace" },
+    "scale": { "display": 120, "h1": 88, "h2": 64, "body": 40, "caption": 44, "small": 28 }
+  },
+  "grid": { "unit": 8, "margin": 96, "columns": 12, "safe_area": 0.06 },
+  "motion": {
+    "ease": { "in": "power2.in", "out": "power3.out", "inOut": "power2.inOut" },
+    "duration": { "fast": 0.25, "base": 0.6, "slow": 1.2 },
+    "stagger": 0.08
+  },
+  "transitions": { "default": "fade", "duration": 0.4 },
+  "captions": {
+    "enabled": true,
+    "mode": "burn",
+    "font": "Inter",
+    "size": 44,
+    "color": "#ffffff",
+    "background": "rgba(0,0,0,0.55)",
+    "position": "bottom",
+    "max_chars": 42
+  },
+  "intro": { "enabled": false, "duration": 2 },
+  "outro": { "enabled": false, "duration": 3 }
+}

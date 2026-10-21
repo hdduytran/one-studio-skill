@@ -1,0 +1,6 @@
+node_modules/
+.DS_Store
+# rendered output inside example / scratch projects
+examples/*/out/**/*.mp4
+examples/*/review/
+.hyperframes/

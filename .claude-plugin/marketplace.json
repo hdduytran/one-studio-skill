@@ -1,0 +1,14 @@
+{
+  "name": "one-studio",
+  "owner": { "name": "hdduytran", "url": "https://github.com/hdduytran" },
+  "metadata": {
+    "description": "One Studio: end-to-end motion video production for Claude Code, from brief to MP4."
+  },
+  "plugins": [
+    {
+      "name": "one-studio",
+      "source": "./plugins/one-studio",
+      "description": "Guided motion-video pipeline: brief → script → storyboard → keyframe review → per-scene incremental render → TTS/captions → publish."
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: Plugin skeleton & gated workflow
-status: pending
+status: done
 depends_on: [1]
 ---
 
@@ -38,3 +38,9 @@ plugins/one-studio/
 - `claude plugin marketplace add ./` + install chạy được.
 - Chạy `/one-studio` trên thư mục rỗng → tạo project, dừng chờ duyệt ở script và storyboard.
 - `status.mjs --estimate` in bảng ước tính.
+
+## Kết quả (2026-10-21)
+- `claude plugin validate` pass cho marketplace và plugin; `marketplace add ./` + `install one-studio@one-studio` thành công (~264 token thường trực, ~2.1k khi gọi skill).
+- Chạy `/one-studio` headless trên thư mục rỗng: tạo project, tự duyệt brief, **dừng chờ duyệt** ở kịch bản, storyboard và bảng ước tính credit.
+- `status.mjs --estimate` in bảng scene × loại × token + reference + thời gian render + cảnh báo (> 8 scene, 3d/character/explainer).
+- Thêm so với plan: `--approve <gate>` lưu sha256 của file input → sửa file sau khi duyệt tự mở lại gate; `series.json` ghi danh sách tập; 12 test `node:test`.
