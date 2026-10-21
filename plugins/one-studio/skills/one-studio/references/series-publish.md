@@ -7,10 +7,10 @@
 - Changing the series brand affects every episode that re-renders afterwards; bump `version` and say so.
 
 ## Publish (gate 10)
-`node "$S/scripts/publish.mjs" D [--ratios 9:16,1:1] [--thumb-title "…"] [--thumb-subtitle "…"]`
+`node "$S/scripts/publish.mjs" D [--ratios 9:16,1:1] [--thumb-frame <scene>@<s>] [--thumb-title "…"] [--thumb-subtitle "…"]`
 - Needs a current final render (gate 9). Ratios default to `studio.json → format.exports`.
 - Each extra ratio re-renders every scene from the same sources at the new size (HyperFrames and lemo re-layout; `.os-portrait` / `.os-square` classes let scenes adapt), cached per scene and ratio in `out/<ratio>/scenes/`. Remotion scenes are fitted from their main clip over a blurred copy.
 - Audio and captions are shared; portrait captions are 1.35× larger.
-- Look at `out/<ratio>/sheet.jpg` (one frame per scene) before telling the user it is done; fix scenes that do not fit (usually wide diagrams) with `.os-portrait` CSS in that scene.
-- Thumbnails: `out/<name>-thumb-<ratio>.jpg`, brand title card (accent bar, title, series · episode, logo).
+- Problems should already be visible at gate 5 (`review/sheet-<ratio>.jpg`). Look at `out/<ratio>/sheet.jpg` (one frame per scene) before telling the user it is done; fix scenes that do not fit (usually wide diagrams) in a `<style data-ratio="9:16">` block in that scene: only that ratio re-renders, the main video and its approvals stay.
+- Thumbnails: `out/<name>-thumb-<ratio>.jpg`. Default: brand title card (accent bar, title, series · episode, logo). `--thumb-frame s02@3.5` uses that frame of each ratio's own clip; add `--thumb-title` to lay the title card over it (bottom scrim).
 - `out/manifest.json`: every video (ratio, size, duration, LUFS, bytes, sha256), thumbnails, captions, scene hashes, audio hash.

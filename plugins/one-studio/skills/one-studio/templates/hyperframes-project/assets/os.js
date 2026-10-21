@@ -1,10 +1,43 @@
-/* one-studio scene runtime v1 — deterministic helpers on top of a paused GSAP timeline.
+/* one-studio scene runtime v2 — deterministic helpers on top of a paused GSAP timeline.
  * Every helper places tweens at absolute scene times, so any frame can be rendered alone.
  * Usage in a scene:  const S = OS.scene("s01"); S.words(".os-display", { at: 0.2 }); S.done();
  */
 (function () {
   "use strict";
   var B = window.BRAND || {};
+  // Folder of this file (…/assets/), to resolve preview audio wherever the scene is mounted.
+  var ASSETS = ((document.currentScript && document.currentScript.src) || "").replace(/os\.js(?:[?#].*)?$/, "");
+
+  function gcd(a, b) { return b ? gcd(b, a % b) : a; }
+  // <style data-ratio="9:16,4:5"> blocks only apply at those aspect ratios (hashed per ratio as well).
+  function ratioStyles(w, h) {
+    var g = gcd(w, h) || 1;
+    var ratio = w / g + ":" + h / g;
+    Array.prototype.slice.call(document.querySelectorAll("style[data-ratio]")).forEach(function (el) {
+      var list = el.getAttribute("data-ratio").split(",").map(function (s) { return s.trim(); });
+      el.media = list.indexOf(ratio) >= 0 ? "all" : "not all";
+    });
+    return ratio;
+  }
+
+  // Studio preview only: play the scene's SFX cues (assets/audio-cues.js, from storyboard sfx[]) with howler.js.
+  // Never under automation (renders, snapshots): the delivered mix is built by FFmpeg (concat-and-mix).
+  function previewAudio(api) {
+    var cues = (window.OS_CUES || {})[api.id];
+    if (!cues || !cues.length || !window.Howl || navigator.webdriver || typeof requestAnimationFrame !== "function") return;
+    var sounds = cues.map(function (c) {
+      return { at: c.at, howl: new window.Howl({ src: [ASSETS + c.src], html5: true, preload: true, volume: Math.min(1, Math.pow(10, (c.gain || 0) / 20)) }) };
+    });
+    var last = -1;
+    (function tick() {
+      var t = api.tl.time();
+      if (last >= 0 && t > last && t - last < 0.5) {
+        sounds.forEach(function (s) { if (s.at > last && s.at <= t) { s.howl.stop(); s.howl.play(); } });
+      }
+      last = t;
+      requestAnimationFrame(tick);
+    })();
+  }
   var M = B.motion || { ease: { in: "power2.in", out: "power3.out", inOut: "power2.inOut" }, duration: { fast: 0.25, base: 0.6, slow: 1.2 }, stagger: 0.08 };
   var T = B.transitions || { default: "fade", duration: 0.4 };
 
@@ -54,6 +87,7 @@
     var w = +root.getAttribute("data-width");
     var h = +root.getAttribute("data-height");
     root.classList.add(w > h * 1.2 ? "os-landscape" : h > w * 1.2 ? "os-portrait" : "os-square");
+    root.setAttribute("data-os-ratio", ratioStyles(w, h));
     var tl = gsap.timeline({ paused: true });
     window.__timelines = window.__timelines || {};
     window.__timelines[id] = tl;
@@ -141,6 +175,29 @@
         return anim;
       },
 
+      // VO sync: start time (scene seconds) of a storyboard line, from <script id="os-lines"> written by
+      // build-audio / sync-lines; `fallback` before the audio exists.
+      line: function (id, fallback) {
+        var t = lineTimes()[id];
+        return t ? t.start : fallback == null ? 0 : fallback;
+      },
+
+      // Reveal every [data-line="<line-id>"] element when its sentence starts (offset default −0.1 s).
+      // Per element: data-enter="up|fade|pop|words…" (default o.kind or "up"), data-at="2.5" before the VO exists.
+      lines: function (o) {
+        o = o || {};
+        var times = lineTimes();
+        q("[data-line]").forEach(function (el, i) {
+          var t = times[el.getAttribute("data-line")];
+          var at = t ? t.start : el.hasAttribute("data-at") ? parseFloat(el.getAttribute("data-at")) : (o.at || 0.3) + i * (o.gap || 2.5);
+          at = Math.max(0, at + (o.offset == null ? -0.1 : o.offset));
+          var kind = el.getAttribute("data-enter") || o.kind || "up";
+          if (kind === "words") api.words(el, { at: at });
+          else api.enter(el, { at: at, kind: kind, stagger: 0 });
+        });
+        return api;
+      },
+
       // Transition in/out from data-transition-in / data-transition-out or the brand default.
       done: function () {
         var kin = root.getAttribute("data-transition-in") || T.default;
@@ -160,9 +217,17 @@
         }
         if (kout !== "cut") tl.fromTo(veil, { autoAlpha: 0 }, { autoAlpha: 1, duration: td, ease: "none", immediateRender: false }, Math.max(0, dur - td));
         tl.seek(0);
+        previewAudio(api);
         return api;
       },
     };
+    var cachedLines = null;
+    function lineTimes() {
+      if (cachedLines) return cachedLines;
+      var el = document.getElementById("os-lines");
+      try { cachedLines = el ? JSON.parse(el.textContent) : {}; } catch (e) { cachedLines = {}; }
+      return cachedLines;
+    }
     return api;
   }
 
@@ -191,5 +256,5 @@
     return el.querySelectorAll(".os-bar");
   }
 
-  window.OS = { scene: scene, barChart: barChart, splitWords: splitWords, version: 1 };
+  window.OS = { scene: scene, barChart: barChart, splitWords: splitWords, version: 2 };
 })();

@@ -56,3 +56,27 @@ export function buildSrt(cues, { maxChars = 42 } = {}) {
   }
   return out.join("\n");
 }
+
+// ---------- Caption mode (gate 0 question, re-askable at gate 7) ----------
+// none     no captions at all (build-audio skips captions.srt, concat-and-mix adds nothing)
+// sidecar  only out/<name>.srt next to the video
+// mux      soft subtitle track (mov_text) + .srt; stream copy, no libass needed
+// burn     drawn into the picture (needs FFmpeg with libass) + .srt
+export const CAPTION_MODES = ["none", "sidecar", "mux", "burn"];
+
+// What the user chose: studio.json → captions (per project) wins over brand.json → captions (series).
+export function captionSetting(project) {
+  const pick = (c) => (!c ? null : c.enabled === false || c.mode === "none" ? "none" : c.mode ?? null);
+  return pick(project.studio?.captions) ?? pick(project.brand?.captions) ?? "burn";
+}
+
+// The mode this machine can deliver: burn falls back to mux when FFmpeg has no libass.
+export function captionMode(project, { libass, warn = () => {} } = {}) {
+  const want = captionSetting(project);
+  if (want !== "burn") return want;
+  if (libass === false) {
+    warn("⚠ captions: burn needs FFmpeg with libass (no `subtitles` filter here) → using mux (soft track + .srt)");
+    return "mux";
+  }
+  return want;
+}

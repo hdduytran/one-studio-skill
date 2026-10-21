@@ -120,7 +120,7 @@
         },
         "engine": {
           "$ref": "#/$defs/engine",
-          "description": "Override; default comes from the type (3d→remotion, character→lemo, else hyperframes)."
+          "description": "Override; default comes from the type: character→lemo, 3d→hyperframes (three.js) unless three.physics or three.postfx → remotion, everything else→hyperframes."
         },
         "duration": {
           "type": "number",
@@ -143,6 +143,13 @@
           "items": {
             "$ref": "#/$defs/line"
           }
+        },
+        "sfx": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sfxCue"
+          },
+          "description": "Sound effects for this scene (scene-relative)."
         },
         "assets": {
           "type": "array",
@@ -222,6 +229,60 @@
               "description": "Needs post-processing (bloom, DOF…): renders with Remotion + R3F."
             }
           }
+        }
+      }
+    },
+    "sfxCue": {
+      "description": "One sound effect placed relative to the scene start (or to the start of `line`). Mixed by concat-and-mix; never part of the picture.",
+      "type": "object",
+      "required": [
+        "at"
+      ],
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "required": [
+            "name"
+          ]
+        },
+        {
+          "required": [
+            "src"
+          ]
+        }
+      ],
+      "properties": {
+        "name": {
+          "enum": [
+            "whoosh",
+            "swoosh",
+            "pop",
+            "click",
+            "ding",
+            "riser",
+            "impact"
+          ],
+          "description": "Built-in offline SFX (make-sfx.mjs)."
+        },
+        "src": {
+          "type": "string",
+          "description": "Audio file relative to the project instead of a built-in."
+        },
+        "at": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Seconds from the scene start, or from the start of `line`."
+        },
+        "line": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "description": "Anchor to a storyboard line id (its VO start, from audio/manifest.json)."
+        },
+        "gain": {
+          "type": "number",
+          "minimum": -60,
+          "maximum": 12,
+          "description": "dB, default 0."
         }
       }
     }

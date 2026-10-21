@@ -38,8 +38,44 @@ export async function speech(ep, text, { timeoutMs = 120000 } = {}) {
     body: JSON.stringify({ model: ep.model, input: text, voice: ep.voice, response_format: ep.format ?? "wav", speed: ep.speed ?? 1 }),
     signal: AbortSignal.timeout(timeoutMs),
   });
-  if (!res.ok) throw new Error(`TTS ${ep.model} @ ${ep.base_url}: HTTP ${res.status} ${(await res.text()).slice(0, 300)}`);
+  if (!res.ok) {
+    const body = (await res.text()).slice(0, 300);
+    let hint = "";
+    // A wrong voice id is the usual first-run failure (init writes a placeholder): name the real ones.
+    if (res.status >= 400 && res.status < 500) {
+      const v = await listVoices(ep).catch(() => null);
+      if (v?.voices.length && !v.voices.includes(ep.voice)) hint = `\n  voice "${ep.voice}" is not on this server. Available: ${v.voices.join(", ")}\n  Listen: tts-openai-compatible.mjs <dir> --samples all --allow-tts · set: --use-voice <id>`;
+    }
+    throw new Error(`TTS ${ep.model} @ ${ep.base_url}: HTTP ${res.status} ${body}${hint}`);
+  }
   return { bytes: Buffer.from(await res.arrayBuffer()), contentType: res.headers.get("content-type") ?? "" };
+}
+
+// Voice ids a server offers. ZeroTTS: GET /v1/audio/voices; others use /v1/voices or /voices.
+// Accepts ["id", …], [{ id | voice_id | name }], { voices: […] } or { data: […] }. No synthesis, no consent needed.
+export async function listVoices(ep, { timeoutMs = 8000 } = {}) {
+  const key = ep.key_env ? process.env[ep.key_env] : undefined;
+  const tried = [];
+  for (const path of ["/v1/audio/voices", "/v1/voices", "/voices"]) {
+    const url = `${baseUrl(ep.base_url)}${path}`;
+    try {
+      const res = await fetch(url, { headers: key ? { Authorization: `Bearer ${key}` } : {}, signal: AbortSignal.timeout(timeoutMs) });
+      if (!res.ok) {
+        tried.push(`${path} HTTP ${res.status}`);
+        continue;
+      }
+      const j = await res.json();
+      const arr = Array.isArray(j) ? j : j.voices ?? j.data ?? (typeof j === "object" ? Object.keys(j) : []);
+      const voices = arr.map((v) => (typeof v === "string" ? v : v?.id ?? v?.voice_id ?? v?.name)).filter(Boolean);
+      return { url, voices: [...new Set(voices)] };
+    } catch (err) {
+      tried.push(`${path} ${err.cause?.code ?? err.name}`);
+      if (err.cause?.code === "ECONNREFUSED") break;
+    }
+  }
+  const e = new Error(`no voice list at ${ep.base_url} (${tried.join("; ")})`);
+  e.tried = tried;
+  throw e;
 }
 
 // Raw TTS bytes → mono 48 kHz PCM WAV, leading/trailing silence trimmed (if enabled).

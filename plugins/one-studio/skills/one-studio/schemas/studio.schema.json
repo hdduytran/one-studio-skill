@@ -232,11 +232,14 @@
         "music": {
           "type": [
             "string",
-            "null"
-          ]
+            "null",
+            "boolean"
+          ],
+          "description": "Music bed path relative to the project (make-music.mjs --use <bed|file>); null = not chosen yet (gate 7 asks); false = the user chose no music."
         },
         "sfx": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Mix storyboard scenes[].sfx[] cues (default true; false mutes them all)."
         },
         "loudness": {
           "type": "number",
@@ -321,6 +324,24 @@
           "$ref": "#/$defs/output"
         }
       }
+    },
+    "captions": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Per-project caption choice; overrides brand.json → captions (status.mjs --captions <mode>).",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "mode": {
+          "enum": [
+            "none",
+            "sidecar",
+            "mux",
+            "burn"
+          ]
+        }
+      }
     }
   },
   "$defs": {
@@ -399,6 +420,13 @@
             "null"
           ],
           "description": "Scene length stretched to fit its VO (written by build-audio)."
+        },
+        "ratio_review": {
+          "type": "object",
+          "description": "Export ratio → variant hash last captured by keyframe-stills (review only; approval follows the main ratio).",
+          "additionalProperties": {
+            "type": "string"
+          }
         }
       }
     },

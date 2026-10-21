@@ -3,16 +3,18 @@
 //   node build-audio.mjs <project-dir> [--allow-tts] [--dry-run]
 // - One TTS call per storyboard line (cached by text+model+voice+speed in audio/cache/).
 // - Scene duration = max(storyboard duration, lead-in + sentences + pauses + padding).
-//   HyperFrames scene files get the new data-duration; keyframe approval carries over.
-// - Writes audio/vo.wav, captions.srt, audio/manifest.json.
+//   HyperFrames scene files get the new data-duration and, when they tag elements with data-line,
+//   the VO line timings (<script id="os-lines">); keyframe approvals carry over (VO-driven changes only).
+// - Writes audio/vo.wav, captions.srt (unless captions are "none"), audio/manifest.json.
 // Refuses to call TTS until the user agreed (studio.json → services.tts, or --allow-tts after asking).
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { isMain, loadProject, now, parseArgs, sceneEngine } from "./lib/project.mjs";
 import { audioHash, sceneHash, sceneSourceExists } from "./lib/hash.mjs";
-import { buildIndex, sceneFile } from "./lib/scenes.mjs";
+import { buildIndex, sceneFile, writeLineTimes } from "./lib/scenes.mjs";
 import { cacheKey, endpointFor, SAMPLE_RATE, synthLine, voiceFor } from "./lib/tts.mjs";
-import { buildSrt } from "./lib/captions.mjs";
+import { buildSrt, captionSetting } from "./lib/captions.mjs";
+import { writeAudioCues } from "./lib/sfx.mjs";
 import { run } from "./lib/ffmpeg.mjs";
 
 const r3 = (n) => Math.round(n * 1000) / 1000;
@@ -98,10 +100,12 @@ export async function buildAudio(dir, { allowTts = false, dryRun = false, log = 
     if (!state) studio.scenes.push((state = { id: s.id, hash: null, approved_hash: null, clip: null, duration: null, status: "planned" }));
     const before = sceneSourceExists(project, s) ? sceneHash(project, s) : null;
     state.fit_duration = fit > s.duration ? fit : null;
-    if (setSceneDuration(project, s, fit) || (sceneEngine(s, studio) !== "hyperframes" && before)) {
+    const lengthChanged = setSceneDuration(project, s, fit);
+    const timingChanged = writeLineTimes(project, s, lines);
+    if (lengthChanged || timingChanged || (sceneEngine(s, studio) !== "hyperframes" && before)) {
       const after = sceneHash(project, s);
       if (after !== before) {
-        // Only the length changed: the user's keyframe approval still holds.
+        // Only the length / VO reveal timings changed: the user's keyframe approval still holds.
         if (before && state.approved_hash === before) state.approved_hash = after;
         changed.push(s.id);
       }
@@ -127,8 +131,11 @@ export async function buildAudio(dir, { allowTts = false, dryRun = false, log = 
     run("ffmpeg", ["-y", "-v", "error", ...inputs, "-filter_complex_script", script, "-map", "[vo]", "-ac", "1", "-ar", String(SAMPLE_RATE), "-c:a", "pcm_s16le", vo]);
   }
 
-  const maxChars = project.brand?.captions?.max_chars ?? 42;
-  writeFileSync(join(project.root, "captions.srt"), buildSrt(cues, { maxChars }));
+  // The user may have chosen no captions at all (gate 0 / gate 7): then there is no .srt to keep in sync.
+  const withCaptions = captionSetting(project) !== "none";
+  const srtPath = join(project.root, "captions.srt");
+  if (withCaptions) writeFileSync(srtPath, buildSrt(cues, { maxChars: project.brand?.captions?.max_chars ?? 42 }));
+  else rmSync(srtPath, { force: true });
   // Save first: the manifest hash must match what status.mjs will compute.
   project.save();
   const manifest = {
@@ -136,12 +143,14 @@ export async function buildAudio(dir, { allowTts = false, dryRun = false, log = 
     at: now(),
     duration: total,
     vo: placed.length ? "audio/vo.wav" : null,
-    captions: "captions.srt",
+    captions: withCaptions ? "captions.srt" : null,
     calls: jobs.filter((j) => !j.cached).length,
     scenes: manifestScenes,
   };
   writeFileSync(join(project.root, "audio", "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
   if (changed.length) buildIndex(project);
+  // Line-anchored SFX cues follow the new timings in the studio preview too.
+  if (existsSync(join(project.root, "assets", "os.js"))) writeAudioCues(project);
   return { project, jobs, manifest, changed };
 }
 
@@ -158,8 +167,8 @@ if (isMain(import.meta.url)) {
         console.log(`${r.jobs.length} sentence(s), ${r.calls.length} TTS call(s) needed, ${r.jobs.length - r.calls.length} cached`);
         return;
       }
-      console.log(`✓ audio/vo.wav ${r.manifest.duration}s, captions.srt, ${r.manifest.calls} TTS call(s)`);
-      if (r.changed.length) console.log(`  scene length changed to fit VO: ${r.changed.join(", ")} (these re-render; approvals kept)`);
+      console.log(`✓ audio/vo.wav ${r.manifest.duration}s, ${r.manifest.captions ?? "no captions (captions: none)"}, ${r.manifest.calls} TTS call(s)`);
+      if (r.changed.length) console.log(`  fitted to the VO (length / line timings): ${r.changed.join(", ")} (these re-render; approvals and gates 5–6 kept)`);
     })
     .catch((err) => {
       console.error(err.cause ? `${err.message}: ${err.cause.code ?? err.cause.message}` : err.message);

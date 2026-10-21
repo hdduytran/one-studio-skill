@@ -7,6 +7,7 @@ import { basename, dirname, join } from "node:path";
 
 export const PINS = {
   gsap: "3.14.2",
+  howler: "2.2.4",
   "lottie-web": "5.13.0",
   svgo: "4.1.0",
   three: "0.170.0",
@@ -43,6 +44,13 @@ export function vendorGsap(assetsDir, plugins = []) {
   const out = [copyInto(join(pkg, "dist", "gsap.min.js"), join(assetsDir, "vendor"))];
   for (const p of plugins) out.push(copyInto(join(pkg, "dist", `${p}.min.js`), join(assetsDir, "vendor")));
   return out;
+}
+
+// howler.js (MIT): audio in the local review/picker page and the studio preview of SFX cues.
+// Never used for the delivered mix (FFmpeg builds it in concat-and-mix).
+export function vendorHowler(assetsDir) {
+  const pkg = ensurePackage("howler", PINS.howler);
+  return copyInto(join(pkg, "dist", "howler.core.min.js"), join(assetsDir, "vendor"));
 }
 
 export function vendorLottie(assetsDir) {

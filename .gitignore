@@ -15,4 +15,7 @@ examples/*/assets/brand.css
 examples/*/assets/brand.js
 examples/*/assets/os.css
 examples/*/assets/os.js
+examples/*/assets/audio-cues.js
+examples/*/assets/music/
+examples/*/assets/sfx/
 .hyperframes/

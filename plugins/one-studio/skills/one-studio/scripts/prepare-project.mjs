@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 // Install the HyperFrames scene runtime into a project (idempotent; re-run after any brand change):
-//   hyperframes.json, assets/os.css, assets/os.js, assets/vendor/gsap.min.js (+ lottie when needed),
+//   hyperframes.json, assets/os.css, assets/os.js, assets/vendor/gsap.min.js + howler.core.min.js (+ lottie/three when needed),
+//   assets/audio-cues.js (storyboard SFX for the studio preview),
 //   assets/brand.css + brand.js (from brand.json), optimised assets, index.html preview.
 //   node prepare-project.mjs <project-dir> [--offline] [--no-svgo]
 import { copyFileSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { TEMPLATE_DIR, isMain, loadProject, parseArgs, sceneEngine } from "./lib/project.mjs";
 import { buildIndex } from "./lib/scenes.mjs";
-import { vendorGsap, vendorLottie, vendorThree } from "./lib/vendor.mjs";
+import { vendorGsap, vendorHowler, vendorLottie, vendorThree } from "./lib/vendor.mjs";
+import { writeAudioCues } from "./lib/sfx.mjs";
 import { brandToCss } from "./brand-to-css.mjs";
 import { optimizeAssets } from "./optimize-assets.mjs";
 
@@ -20,6 +22,7 @@ export function prepareProject(dir, { offline = false, svgo = true } = {}) {
   if (!existsSync(join(project.root, "hyperframes.json"))) copyFileSync(join(tpl, "hyperframes.json"), join(project.root, "hyperframes.json"));
   for (const f of ["os.css", "os.js"]) copyFileSync(join(tpl, "assets", f), join(assets, f));
   vendorGsap(assets);
+  vendorHowler(assets);
   const types = new Set((project.storyboard?.scenes ?? []).map((s) => s.type));
   if (types.has("lottie")) vendorLottie(assets);
   if (types.has("3d")) vendorThree(assets);
@@ -29,6 +32,7 @@ export function prepareProject(dir, { offline = false, svgo = true } = {}) {
     const dir = join(project.root, "scenes", s.id);
     if (sceneEngine(s, project.studio) === "lemo" && existsSync(dir)) copyFileSync(join(assets, "brand.js"), join(dir, "brand.js"));
   }
+  writeAudioCues(project);
   const opt = optimizeAssets(project.root, { svgo });
   const index = buildIndex(project);
   return { project, brand, opt, index };

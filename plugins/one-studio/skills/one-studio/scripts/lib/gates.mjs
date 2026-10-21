@@ -23,7 +23,10 @@ export function gateInputHash(project, gate) {
       return fileHash(join(project.root, gate.input));
     case "keyframes":
     case "build":
-      return scenesHash(project);
+      // Layout only: build-audio stretching a scene or re-timing its data-line reveals keeps the
+      // per-scene approvals, so it must not re-open these gates either (clips are still re-rendered:
+      // preview/render/publish hash the full scenes).
+      return scenesHash(project, { layoutOnly: true });
     case "audio":
       return audioHash(project);
     case "preview":
@@ -63,6 +66,7 @@ export function gateProblems(project, gate) {
   if (gate.id === "audio") {
     const m = readAudioManifest(project);
     const needsVo = scenes.some((s) => s.lines?.length);
+    if (project.studio.audio?.music == null) p.push("music not chosen yet: make-music.mjs --samples → audio-picker.mjs → ask → make-music.mjs --use <bed|file|none>");
     if (needsVo && !m) p.push("no audio yet: run build-audio.mjs");
     else if (m && m.hash !== audioHash(project)) p.push("audio is out of date: run build-audio.mjs");
   }
@@ -81,10 +85,13 @@ export function readAudioManifest(project) {
   return existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : null;
 }
 
+// Gates approved by one-studio ≤ 0.2 stored the full scenes hash for keyframes/build; still accept it.
+const legacyHash = (project, gate) => (["keyframes", "build"].includes(gate.id) ? scenesHash(project) : null);
+
 export function gateState(project, gate) {
   const record = project.studio.gates?.[gate.id] ?? {};
   const current = gateInputHash(project, gate);
-  const stale = Boolean(record.done && record.hash && current && record.hash !== current);
+  const stale = Boolean(record.done && record.hash && current && record.hash !== current && record.hash !== legacyHash(project, gate));
   return { ...gate, done: Boolean(record.done), stale, at: record.at ?? null, currentHash: current };
 }
 
