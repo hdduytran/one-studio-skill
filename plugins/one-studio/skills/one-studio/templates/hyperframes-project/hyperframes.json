@@ -1,0 +1,11 @@
+{
+  "$schema": "https://hyperframes.heygen.com/schema/hyperframes.json",
+  "paths": {
+    "blocks": "scenes",
+    "components": "scenes/components",
+    "assets": "assets"
+  },
+  "media": {
+    "autoProxy": true
+  }
+}

@@ -1,8 +1,8 @@
 // Shared helpers for one-studio scripts: paths, JSON IO, hashing, gates, scene routing.
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { validate } from "./schema.mjs";
 
 export const SKILL_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -25,9 +25,9 @@ export const GATES = [
   { id: "script", n: 2, input: "script.md", title: "Script — user approval" },
   { id: "storyboard", n: 3, input: "storyboard.json", title: "Storyboard — user approval" },
   { id: "estimate", n: 4, input: "storyboard.json", title: "Credit estimate — user acknowledges" },
-  { id: "keyframes", n: 5, input: "storyboard.json", title: "Keyframe review — user approval" },
-  { id: "build", n: 6, input: "storyboard.json", title: "Build scenes" },
-  { id: "audio", n: 7, input: "storyboard.json", title: "Audio (TTS, music, SFX)" },
+  { id: "keyframes", n: 5, input: null, title: "Keyframe review — user approval" },
+  { id: "build", n: 6, input: null, title: "Build scenes" },
+  { id: "audio", n: 7, input: null, title: "Audio (TTS, music, SFX)" },
   { id: "preview", n: 8, input: null, title: "Low-res preview — user approval" },
   { id: "render", n: 9, input: null, title: "Final render" },
   { id: "publish", n: 10, input: null, title: "Publish (ratios, thumbnail)" },
@@ -35,14 +35,14 @@ export const GATES = [
 
 // scene.type → default engine, token cost level, reference files to lazy-load, external deps.
 export const SCENE_TYPES = {
-  text: { engine: "hyperframes", level: "low", refs: ["references/scene-types/text.md"], deps: [] },
-  diagram: { engine: "hyperframes", level: "medium", refs: ["references/scene-types/diagram.md"], deps: ["archify or ak:diagram skill (optional)"] },
-  data: { engine: "hyperframes", level: "medium", refs: ["references/scene-types/data.md"], deps: [] },
-  lottie: { engine: "hyperframes", level: "medium", refs: ["references/scene-types/lottie-rive.md"], deps: ["@lottiefiles/dotlottie-web"] },
-  rive: { engine: "hyperframes", level: "medium", refs: ["references/scene-types/lottie-rive.md"], deps: ["@rive-app/canvas"] },
-  explainer: { engine: "hyperframes", level: "high", refs: ["references/scene-types/explainer-anatomy.md"], deps: ["anatomy skill (wheresryan22/anatomy)"] },
+  text: { engine: "hyperframes", level: "low", refs: ["references/scene-types/_common.md", "references/scene-types/text.md"], deps: [] },
+  diagram: { engine: "hyperframes", level: "medium", refs: ["references/scene-types/_common.md", "references/scene-types/diagram.md"], deps: ["archify or ak:diagram skill (optional)"] },
+  data: { engine: "hyperframes", level: "medium", refs: ["references/scene-types/_common.md", "references/scene-types/data.md"], deps: [] },
+  lottie: { engine: "hyperframes", level: "medium", refs: ["references/scene-types/_common.md", "references/scene-types/lottie-rive.md"], deps: [] },
+  rive: { engine: "hyperframes", level: "medium", refs: ["references/scene-types/_common.md", "references/scene-types/lottie-rive.md"], deps: ["@rive-app/canvas"] },
+  explainer: { engine: "hyperframes", level: "high", refs: ["references/scene-types/_common.md", "references/scene-types/explainer-anatomy.md"], deps: ["anatomy skill (wheresryan22/anatomy)"] },
   character: { engine: "lemo", level: "high", refs: ["references/scene-types/character-lemo.md"], deps: ["lemo-opuscar library (~350 MB deps)"] },
-  "3d": { engine: "remotion", level: "high", refs: ["references/scene-types/3d.md"], deps: ["remotion + @remotion/three"] },
+  "3d": { engine: "hyperframes", level: "high", refs: ["references/scene-types/_common.md", "references/scene-types/3d.md"], deps: ["three (vendored)"] },
 };
 
 export const sha256 = (buf) => createHash("sha256").update(buf).digest("hex");
@@ -66,6 +66,8 @@ export function validateKind(kind, data) {
 
 export function sceneEngine(scene, studio) {
   if (scene.engine) return scene.engine;
+  // 3D runs as plain three.js inside HyperFrames; Remotion (R3F) only for physics / post-processing.
+  if (scene.type === "3d" && (scene.three?.physics || scene.three?.postfx)) return "remotion";
   const byType = SCENE_TYPES[scene.type]?.engine ?? "hyperframes";
   // A whole-3D project defaults to Remotion for its 2D scenes as well.
   if (byType === "hyperframes" && studio?.engine?.default === "remotion") return "remotion";
@@ -95,22 +97,6 @@ export function loadProject(dir) {
 
 // Placeholders left by templates. A gate input that still has one is not ready.
 export const TODO_RE = /<!--\s*TODO|\bTODO:/;
-
-export function gateState(project, gate) {
-  const record = project.studio.gates?.[gate.id] ?? {};
-  const inputPath = gate.input ? join(project.root, gate.input) : null;
-  const current = inputPath ? fileHash(inputPath) : null;
-  const stale = Boolean(record.done && gate.input && record.hash && record.hash !== current);
-  return { ...gate, done: Boolean(record.done), stale, at: record.at ?? null, inputPath, currentHash: current };
-}
-
-export function currentGate(project) {
-  for (const gate of GATES) {
-    const s = gateState(project, gate);
-    if (!s.done || s.stale) return s;
-  }
-  return null;
-}
 
 // Cross-file checks the schemas cannot express.
 export function crossCheck(project) {
@@ -160,3 +146,12 @@ export function parseArgs(argv, { flags = [], options = [] } = {}) {
 }
 
 export const now = () => new Date().toISOString();
+
+// True when the module is the script node was started with (so scripts can also be imported).
+export const isMain = (url) => {
+  try {
+    return pathToFileURL(realpathSync(process.argv[1])).href === url;
+  } catch {
+    return false;
+  }
+};

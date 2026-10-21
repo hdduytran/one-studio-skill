@@ -1,6 +1,7 @@
 // Credit (Claude token) and render-time estimate from the storyboard.
 // Numbers are rough planning ranges, tuned in phase 8 against real runs.
 import { existsSync, statSync } from "node:fs";
+import { sceneHash, sceneSourceExists } from "./hash.mjs";
 import { join } from "node:path";
 import { SCENE_TYPES, SKILL_DIR, sceneEngine } from "./project.mjs";
 
@@ -10,7 +11,7 @@ const HERO_EXPLAINER = [40000, 80000];
 const REVIEW_IMAGE_TOKENS = 1600; // one contact sheet per scene at gate 5
 const DEFAULT_REF_TOKENS = 1500; // reference not written yet
 // Render seconds per output second on a typical laptop, plus fixed start-up per scene.
-const RENDER_RATE = { hyperframes: 2.5, remotion: 4, lemo: 3 };
+const RENDER_RATE = { hyperframes: 2, remotion: 4, lemo: 3 };
 const RENDER_OVERHEAD = 5;
 
 const refTokens = (rel) => {
@@ -31,13 +32,17 @@ export function estimate(project) {
   for (const scene of sb.scenes) {
     const info = SCENE_TYPES[scene.type];
     const state = states.get(scene.id);
-    const cached = state?.status === "rendered" && state.hash && state.hash === state.approved_hash;
+    const hash = sceneSourceExists(project, scene) ? sceneHash(project, scene) : null;
+    // Tokens are spent writing/fixing a scene; rendering costs only machine time.
+    const authored = Boolean(hash && state?.approved_hash === hash);
+    const rendered = Boolean(hash && state?.clip?.includes(hash) && existsSync(join(project.root, state.clip)));
+    const cached = authored && rendered;
     const engine = sceneEngine(scene, project.studio);
     const range = scene.type === "explainer" && scene.explainer?.size === "hero" ? HERO_EXPLAINER : LEVEL_TOKENS[info.level];
     const lines = scene.lines ?? [];
     ttsLines += lines.length;
     ttsChars += lines.reduce((n, l) => n + (l.say ?? l.text).length, 0);
-    if (!cached) {
+    if (!authored) {
       info.refs.forEach((r) => refs.add(r));
       info.deps.forEach((d) => deps.add(d));
     }
@@ -47,13 +52,15 @@ export function estimate(project) {
       engine,
       level: info.level,
       duration: scene.duration,
+      authored,
+      rendered,
       cached,
-      tokens: cached ? [0, 0] : range,
-      renderSeconds: cached ? 0 : Math.round(scene.duration * RENDER_RATE[engine] + RENDER_OVERHEAD),
+      tokens: authored ? [0, 0] : range,
+      renderSeconds: rendered ? 0 : Math.round(scene.duration * RENDER_RATE[engine] + RENDER_OVERHEAD),
     });
   }
 
-  const build = rows.filter((r) => !r.cached);
+  const build = rows.filter((r) => !r.authored);
   const refList = [...refs].map((path) => ({ path, tokens: refTokens(path) }));
   const refTotal = refList.reduce((n, r) => n + r.tokens, 0);
   const sum = (i) => build.reduce((n, r) => n + r.tokens[i], 0);
@@ -79,12 +86,13 @@ export function estimate(project) {
   return {
     scenes: rows,
     toBuild: build.length,
-    cached: rows.length - build.length,
+    cached: rows.filter((r) => r.cached).length,
     duration: rows.reduce((n, r) => n + r.duration, 0),
     references: refList,
     tokens,
     reviewTokens: review,
-    renderSeconds: build.reduce((n, r) => n + r.renderSeconds, 0),
+    toRender: rows.filter((r) => !r.rendered).length,
+    renderSeconds: rows.reduce((n, r) => n + r.renderSeconds, 0),
     services,
     warnings,
   };
@@ -94,13 +102,13 @@ const k = (n) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : Str
 
 export function formatEstimate(e) {
   const out = [];
-  out.push(`Credit estimate — ${e.toBuild} scene(s) to build, ${e.cached} cached, ${e.duration.toFixed(1)}s total`);
+  out.push(`Credit estimate — ${e.toBuild} scene(s) to write/fix, ${e.toRender} to render, ${e.cached} cached, ${e.duration.toFixed(1)}s total`);
   out.push("");
   out.push("| Scene | Type | Engine | Cost | Tokens | Render |");
   out.push("|---|---|---|---|---|---|");
   for (const r of e.scenes) {
-    const tok = r.cached ? "cached" : `${k(r.tokens[0])}–${k(r.tokens[1])}`;
-    out.push(`| ${r.id} | ${r.type} | ${r.engine} | ${r.level} | ${tok} | ${r.cached ? "–" : `~${r.renderSeconds}s`} |`);
+    const tok = r.authored ? "approved" : `${k(r.tokens[0])}–${k(r.tokens[1])}`;
+    out.push(`| ${r.id} | ${r.type} | ${r.engine} | ${r.level} | ${tok} | ${r.rendered ? "cached" : `~${r.renderSeconds}s`} |`);
   }
   out.push("");
   out.push(`References to load (${e.references.length}): ${e.references.map((r) => `${r.path} (~${k(r.tokens)})`).join(", ") || "none"}`);

@@ -1,0 +1,26 @@
+  <div class="os-frame clip" data-start="0" data-duration="{{duration}}" data-track-index="0">
+    <h2 class="os-h2">{{headline}}</h2>
+    <div class="os-diagram">
+      <!-- Replace with the diagram SVG (inline, run optimize-svg first). Classes: stroke, stroke-primary, stroke-accent, fill-*. -->
+      <svg viewBox="0 0 1600 600" xmlns="http://www.w3.org/2000/svg">
+        <rect class="stroke" x="80" y="200" width="320" height="200" rx="24" />
+        <path class="stroke-primary arrow" d="M420 300 H 640" />
+        <rect class="stroke" x="660" y="200" width="320" height="200" rx="24" />
+        <path class="stroke-primary arrow" d="M1000 300 H 1220" />
+        <rect class="stroke-accent" x="1240" y="200" width="320" height="200" rx="24" />
+        <text class="label" x="240" y="312" text-anchor="middle" font-size="44">A</text>
+        <text class="label" x="820" y="312" text-anchor="middle" font-size="44">B</text>
+        <text class="label" x="1400" y="312" text-anchor="middle" font-size="44">C</text>
+      </svg>
+    </div>
+  </div>
+</div>
+<script>
+  const S = OS.scene("{{id}}");
+  S.enter(".os-h2", { at: 0.2 });
+  S.draw(".os-diagram rect, .os-diagram path", { at: 0.6, stagger: 0.35 });
+  S.enter(".os-diagram .label", { at: 1.4, kind: "fade", stagger: 0.35 });
+  S.done();
+</script>
+</body>
+</html>

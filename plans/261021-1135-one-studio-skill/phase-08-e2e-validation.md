@@ -1,7 +1,7 @@
 ---
 phase: 8
 title: End-to-end validation
-status: pending
+status: done
 depends_on: [7]
 ---
 
@@ -23,3 +23,6 @@ depends_on: [7]
 
 ## Done khi
 Tất cả (a)–(f) pass; ghi kết quả vào `plans/reports/tester-*.md`.
+
+## Kết quả (2026-10-21)
+Tất cả (a)–(f) pass. Báo cáo: `plans/reports/tester-261021-e2e.md`. Test nằm ở `tests/` (không đặt trong plugin để plugin nhẹ).

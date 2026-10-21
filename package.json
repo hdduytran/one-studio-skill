@@ -3,10 +3,13 @@
   "private": true,
   "type": "module",
   "description": "Development workspace for the one-studio Claude plugin.",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "test": "node --test tests/*.test.mjs",
     "validate:demo": "node plugins/one-studio/skills/one-studio/scripts/validate.mjs examples/demo/studio.json",
-    "validate:plugin": "claude plugin validate . && claude plugin validate plugins/one-studio"
+    "validate:plugin": "claude plugin validate . && claude plugin validate plugins/one-studio",
+    "test:e2e": "node --test --test-timeout=1800000 tests/e2e/*.test.mjs"
   }
 }

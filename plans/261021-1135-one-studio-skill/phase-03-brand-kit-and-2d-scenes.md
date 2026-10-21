@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: Brand kit & HyperFrames 2D scenes
-status: pending
+status: done
 depends_on: [2]
 ---
 
@@ -27,3 +27,8 @@ Sinh scene 2D (text/kinetic, diagram, data, lottie) từ storyboard, dùng chung
 ## Done khi
 - Storyboard 4 scene (text, diagram, data, lottie) → 4 file HTML preview được trong HyperFrames studio.
 - Đổi 1 màu trong brand.json → tất cả scene đổi theo sau khi chạy `brand-to-css`.
+
+## Kết quả (2026-10-21)
+- `brand-to-css.mjs`, `prepare-project.mjs` (runtime `os.css`/`os.js`; GSAP, lottie, three lấy từ npm cache; font @fontsource có subset tiếng Việt), `new-scene.mjs` + template text/diagram/data/lottie/canvas/three/explainer, `optimize-assets.mjs` (SVGO + Lottie → JS).
+- 4 scene demo render được; đổi màu brand → mọi scene đổi theo (hash đổi), hoàn tác → cache dùng lại.
+- Khác plan: thumbnail dùng HyperFrames snapshot thay cho Satori (bớt một phụ thuộc, dùng chung brand CSS). Rive chưa kiểm chứng.

@@ -3,15 +3,15 @@
 ## Decision
 
 ```
-scene.type == 3d                → Remotion + @remotion/three (R3F, Drei, Rapier, Postprocessing)
-scene.type == character         → lemo-opuscar page rendered to a clip
-scene.type == explainer         → anatomy static SVG, animated in HyperFrames with GSAP
-everything else                 → HyperFrames (HTML/CSS + GSAP)
-studio.engine.default == remotion (whole-3D project) → 2D scenes also in Remotion
-scene.engine set                → that engine (override)
+scene.engine set                         → that engine (override)
+scene.type == 3d + three.physics/postfx  → Remotion + @remotion/three (R3F, Drei, Rapier, Postprocessing)
+scene.type == 3d                         → three.js inside HyperFrames (driven by S.drive)
+scene.type == character                  → lemo-opuscar page rendered to its own clip
+scene.type == explainer                  → anatomy static SVG, animated in HyperFrames with GSAP
+everything else                          → HyperFrames (HTML/CSS + GSAP)
 ```
 
-Why: HyperFrames is HTML/GSAP, which Claude writes reliably with few tokens and fast renders. Remotion is heavier (React project + bundler) but is the strong option for R3F 3D. Remotion is free for individuals and small companies; if a licence ever matters, fall back to HyperFrames + plain three.js in a `<canvas>`.
+Why: HyperFrames is HTML/GSAP, which Claude writes reliably with few tokens and fast renders, and it seeks canvas / WebGL / Lottie deterministically through the scene timeline (verified). Remotion is heavier (React project + ~300 MB install) and is used only when R3F physics or post-processing is worth it. Remotion is free for individuals and companies up to 3 people.
 
 Optional tools that overlap (use only when asked): Motion Canvas, Anime.js (GSAP covers it), Howler.js (studio preview only).
 
@@ -36,20 +36,17 @@ Traps (verified):
 - Output: H.264, yuv420p, fps from `data-fps` or `--fps` (default 30), **no audio track**. Audio is mixed by our FFmpeg step.
 - Do not use HyperFrames' own `tts` / `transcribe` (Kokoro / Whisper): this project uses ZeroTTS / OmniVoice and timings from audio durations.
 
-## Remotion (3D scenes)
+## Remotion (3D scenes with physics / post-fx)
 
-- Separate project in `D/remotion/` from `templates/remotion-project/`.
-- Stills: `npx remotion still <entry> <comp> review/<id>-<n>.png --frame=<n>`.
-- Clip: `npx remotion render <entry> <comp> out/scenes/<id>-<hash>.mp4 --codec=h264`, size and fps from `studio.json`.
-- Brand: the same `brand.json` → TS constants; never restate colours by hand.
+- `new-remotion.mjs D` → `D/remotion/` (pinned versions), `src/brand.generated.ts` from `brand.json`, one composition per scene id; the duration is a prop, so VO fitting needs no code change.
+- Stills and clips go through `keyframe-stills.mjs` / `render-changed-scenes.mjs` (`npx remotion still|render src/index.ts <id> … --gl=swangle|angle`).
 
 ## lemo-opuscar (character scenes)
 
 - Library: `sh <lemo skill>/scripts/setup.sh` → `LIB=<path>`; `setup.sh deps` (~350 MB) only after the user agrees.
 - Read `$LIB/DIRECTOR.md` §3–5 and the ONE chosen `$LIB/styles/<slug>/STYLE.md`. Never list or read all styles; to help choose, read `styles/*/style.json` names only.
 - Page contract: `window.DUR`, deterministic `window.render(t)`, `window.READY = true`.
-- Clip: `cd "$LIB" && node core/render/video.mjs <scene-dir> --fps <fps> --size <W>x<H> --out <D>/out/scenes/<id>-<hash>.raw.mp4`, picture only (skip lemo's TTS/mix: our audio step owns VO), then normalise to the project preset.
-- Stills: `node core/render/still.mjs <scene-dir> 0.5 2 4 --size <W>x<H> --out <D>/review/<id>`.
+- Stills and clips go through `keyframe-stills.mjs` / `render-changed-scenes.mjs` (they call `core/render/still.mjs` / `video.mjs` with the project fps and size), picture only, normalised to the project preset.
 
 ## anatomy (explainer scenes)
 

@@ -1,0 +1,104 @@
+/* one-studio scene base styles v1. Uses brand.css variables only; never hard-code colours or fonts. */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { margin: 0; overflow: hidden; background: var(--c-bg); }
+
+/* 1 unit = 1px at 1080 on the short side, so the same scene scales to any aspect ratio. */
+.os-scene {
+  --u: calc(min(var(--w), var(--h)) / 1080);
+  --pad: calc(var(--margin) * var(--u));
+  --caption-zone: calc(var(--h) * 0.16);
+  position: relative;
+  width: var(--w);
+  height: var(--h);
+  overflow: hidden;
+  background: var(--c-bg);
+  color: var(--c-fg);
+  font-family: var(--font-body);
+  font-weight: var(--fw-body);
+  font-size: calc(var(--fs-body) * var(--u));
+  line-height: 1.25;
+}
+
+/* Full-frame layer. Keeps the bottom caption zone clear. */
+.os-frame {
+  position: absolute;
+  inset: 0;
+  padding: var(--pad) var(--pad) max(var(--pad), var(--caption-zone));
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: calc(var(--grid-unit) * 4 * var(--u));
+}
+.os-center { align-items: center; text-align: center; }
+.os-row { display: flex; flex-direction: row; align-items: center; gap: calc(var(--grid-unit) * 6 * var(--u)); }
+.os-row > * { flex: 1 1 0; min-width: 0; }
+.os-portrait .os-row { flex-direction: column; }
+.os-bg { position: absolute; inset: 0; }
+
+/* Type scale */
+.os-display, .os-h1, .os-h2 { font-family: var(--font-heading); font-weight: var(--fw-heading); line-height: 1.05; letter-spacing: -0.02em; }
+.os-display { font-size: calc(var(--fs-display) * var(--u)); }
+.os-h1 { font-size: calc(var(--fs-h1) * var(--u)); }
+.os-h2 { font-size: calc(var(--fs-h2) * var(--u)); }
+.os-body { font-size: calc(var(--fs-body) * var(--u)); }
+.os-small { font-size: calc(var(--fs-small) * var(--u)); }
+.os-mono { font-family: var(--font-mono); }
+.os-portrait .os-display { font-size: calc(var(--fs-display) * 0.8 * var(--u)); }
+
+/* Colour roles */
+.os-primary { color: var(--c-primary); }
+.os-secondary { color: var(--c-secondary); }
+.os-accent { color: var(--c-accent); }
+.os-muted { color: var(--c-muted); }
+.os-word { display: inline-block; white-space: pre; }
+
+.os-card {
+  background: color-mix(in srgb, var(--c-fg) 6%, transparent);
+  border: calc(2 * var(--u)) solid color-mix(in srgb, var(--c-fg) 14%, transparent);
+  border-radius: calc(var(--grid-unit) * 3 * var(--u));
+  padding: calc(var(--grid-unit) * 5 * var(--u));
+}
+
+.os-logo { height: calc(64 * var(--u)); width: auto; }
+.os-logo-corner { position: absolute; top: var(--pad); right: var(--pad); height: calc(48 * var(--u)); }
+
+/* Lower third */
+.os-lower-third {
+  position: absolute;
+  left: var(--pad);
+  bottom: max(var(--pad), var(--caption-zone));
+  padding: calc(16 * var(--u)) calc(28 * var(--u));
+  background: var(--c-primary);
+  color: var(--c-bg);
+  border-radius: calc(12 * var(--u));
+  font-family: var(--font-heading);
+  font-weight: var(--fw-heading);
+  font-size: calc(var(--fs-small) * 1.2 * var(--u));
+}
+
+/* Diagrams: inline SVG inherits brand colours */
+.os-diagram { width: 100%; height: 100%; max-height: calc(var(--h) - var(--pad) - var(--caption-zone)); }
+.os-diagram svg { width: 100%; height: 100%; overflow: visible; }
+.os-diagram .stroke { fill: none; stroke: var(--c-fg); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+.os-diagram .stroke-primary { fill: none; stroke: var(--c-primary); stroke-width: 4; stroke-linecap: round; }
+.os-diagram .stroke-accent { fill: none; stroke: var(--c-accent); stroke-width: 5; stroke-linecap: round; }
+.os-diagram .fill-primary { fill: var(--c-primary); }
+.os-diagram .fill-accent { fill: var(--c-accent); }
+.os-diagram .fill-muted { fill: var(--c-muted); }
+.os-diagram text { fill: var(--c-fg); font-family: var(--font-body); }
+
+/* Bar chart (built by OS.barChart) */
+.os-bars { display: flex; align-items: flex-end; gap: calc(var(--grid-unit) * 4 * var(--u)); height: 100%; min-height: calc(320 * var(--u)); }
+.os-bar { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: calc(12 * var(--u)); }
+.os-bar-value { font-family: var(--font-heading); font-weight: var(--fw-heading); font-size: calc(var(--fs-h2) * 0.8 * var(--u)); }
+.os-bar-fill { width: 100%; background: var(--c-primary); border-radius: calc(10 * var(--u)) calc(10 * var(--u)) 0 0; transform-origin: 50% 100%; }
+.os-bar.is-highlight .os-bar-fill { background: var(--c-accent); }
+.os-bar.is-highlight .os-bar-value { color: var(--c-accent); }
+.os-bar-label { color: var(--c-muted); font-size: calc(var(--fs-small) * var(--u)); }
+
+/* Lottie / canvas holders */
+.os-media { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+.os-media > svg, .os-media > canvas { max-width: 100%; max-height: 100%; }
+
+/* Transition veil, driven by OS.scene().done() */
+.os-veil { position: absolute; inset: 0; background: var(--c-bg); pointer-events: none; z-index: 100; }

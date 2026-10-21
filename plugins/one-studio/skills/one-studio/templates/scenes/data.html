@@ -1,0 +1,17 @@
+  <div class="os-frame clip" data-start="0" data-duration="{{duration}}" data-track-index="0">
+    <h2 class="os-h2">{{headline}}</h2>
+    <div class="os-chart" style="flex: 1 1 auto; min-height: 0"></div>
+  </div>
+</div>
+<script>
+  const rows = {{data_json}};
+  const bars = OS.barChart(".os-chart", rows, { highlight: "last", scale: "{{data_scale}}" });
+  const S = OS.scene("{{id}}");
+  S.enter(".os-h2", { at: 0.2 });
+  S.bars(bars, { at: 0.8 });
+  S.count(".os-bar-value", { at: 0.8 });
+  S.enter(".os-bar-label", { at: 0.6, kind: "fade", stagger: 0.1 });
+  S.done();
+</script>
+</body>
+</html>

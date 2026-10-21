@@ -30,11 +30,12 @@ test("init creates a valid project that resumes at the brief gate", () => {
   assert.equal(run("init-project.mjs", dir).code, 1, "refuses to re-init");
 });
 
-test("portrait + English + 3d sets format, OmniVoice and Remotion", () => {
+test("portrait + English + 3d sets format and OmniVoice; 3D stays in HyperFrames", () => {
   const { dir } = freshProject(["--aspect", "9:16", "--lang", "en", "--dimension", "3d"]);
   const studio = readJson(join(dir, "studio.json"));
   assert.deepEqual([studio.format.width, studio.format.height], [1080, 1920]);
-  assert.equal(studio.engine.default, "remotion");
+  assert.equal(studio.engine.default, "hyperframes");
+  assert.equal(studio.engine.dimension, "3d");
   assert.equal(studio.audio.tts.vi, undefined);
   assert.equal(studio.audio.tts.default.model, "omnivoice");
 });
@@ -87,7 +88,7 @@ test("gates: order, TODO guard, storyboard validation, re-open on edit", () => {
   const s = JSON.parse(run("status.mjs", dir, "--json").out);
   assert.equal(s.current, "script");
   assert.ok(s.gates.find((g) => g.id === "script").stale);
-  assert.match(run("status.mjs", dir, "--approve", "estimate").err, /changed after gate 2/);
+  assert.match(run("status.mjs", dir, "--approve", "estimate").err, /Inputs of gate 2 \(script\) changed/);
   assert.match(run("status.mjs", dir).out, /! +2 Script/);
 });
 
@@ -101,9 +102,15 @@ test("storyboard re-approval keeps existing scene state and drops removed scenes
   writeJson(sb, { version: 1, scenes: [scene("s01"), scene("s02")] });
   run("status.mjs", dir, "--approve", "storyboard");
   const studioPath = join(dir, "studio.json");
+  // s01 gets a real source file, an approval and a (fake) rendered clip for its current hash.
+  writeFileSync(join(dir, "scenes", "s01.html"), '<div data-composition-id="s01" data-duration="5"></div>');
+  const ok = run("status.mjs", dir, "--approve-scenes", "s01");
+  assert.equal(ok.code, 0, ok.err);
+  const hash = /s01@([0-9a-f]+)/.exec(ok.out)[1];
   const studio = readJson(studioPath);
-  Object.assign(studio.scenes[0], { hash: "abc", approved_hash: "abc", status: "rendered", clip: "out/scenes/s01-abc.mp4" });
+  Object.assign(studio.scenes[0], { status: "rendered", clip: `out/scenes/s01-${hash}.mp4` });
   writeJson(studioPath, studio);
+  writeFileSync(join(dir, "out", "scenes", `s01-${hash}.mp4`), "");
   writeJson(sb, { version: 1, scenes: [scene("s01"), scene("s03")] });
   const r = run("status.mjs", dir, "--approve", "storyboard");
   assert.match(r.out, /added: s03/);
@@ -121,7 +128,7 @@ test("storyboard re-approval keeps existing scene state and drops removed scenes
 test("estimate: table, references, warnings for many / heavy scenes", () => {
   const { dir } = freshProject();
   const scenes = Array.from({ length: 9 }, (_, i) => scene(`s${String(i + 1).padStart(2, "0")}`));
-  scenes.push(scene("s10", "3d"), scene("s11", "character", { character: { style: "whiteboard" } }));
+  scenes.push(scene("s10", "3d", { three: { physics: true } }), scene("s11", "character", { character: { style: "whiteboard" } }));
   scenes.push(scene("s12", "explainer", { explainer: { size: "hero" } }));
   writeJson(join(dir, "storyboard.json"), { version: 1, scenes });
 
@@ -130,6 +137,7 @@ test("estimate: table, references, warnings for many / heavy scenes", () => {
   assert.match(table.out, /\| s10 \| 3d \| remotion \| high \|/);
   assert.match(table.out, /\| s11 \| character \| lemo \|/);
   assert.match(table.out, /⚠ 12 scenes to build \(> 8\)/);
+  assert.match(table.out, /12 scene\(s\) to write\/fix, 12 to render/);
   assert.match(table.out, /⚠ heavy scene types: 3d, character, explainer/);
   assert.match(table.out, /hero/);
   assert.match(table.out, /TTS .*12 sentence calls.*ask before first call/);

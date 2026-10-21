@@ -52,8 +52,13 @@
     },
     "storyboard": {
       "done": true,
-      "at": "2026-10-21T05:09:26.581Z",
-      "hash": "31c71bafbc9a24b5e2e244f44f8576f7a19a6d69bdc8931d5db31183b6371599"
+      "at": "2026-10-21T05:41:52.294Z",
+      "hash": "41cba190c9b89a1c3750c675b04ccd9fecbbbcb73d93497d03bdf9200df5fcf9"
+    },
+    "estimate": {
+      "done": true,
+      "at": "2026-10-21T05:41:52.344Z",
+      "hash": "41cba190c9b89a1c3750c675b04ccd9fecbbbcb73d93497d03bdf9200df5fcf9"
     }
   },
   "scenes": [
@@ -63,7 +68,7 @@
       "approved_hash": null,
       "clip": null,
       "duration": null,
-      "status": "planned"
+      "status": "built"
     },
     {
       "id": "s02",
@@ -71,7 +76,7 @@
       "approved_hash": null,
       "clip": null,
       "duration": null,
-      "status": "planned"
+      "status": "built"
     },
     {
       "id": "s03",
@@ -79,7 +84,7 @@
       "approved_hash": null,
       "clip": null,
       "duration": null,
-      "status": "planned"
+      "status": "built"
     },
     {
       "id": "s04",
@@ -87,7 +92,7 @@
       "approved_hash": null,
       "clip": null,
       "duration": null,
-      "status": "planned"
+      "status": "built"
     }
   ],
   "audio": {

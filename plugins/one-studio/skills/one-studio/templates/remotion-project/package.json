@@ -1,0 +1,27 @@
+{
+  "name": "one-studio-remotion",
+  "private": true,
+  "type": "module",
+  "description": "one-studio 3D scenes (Remotion + React Three Fiber). Only for 3D scenes that need physics or post-processing.",
+  "scripts": {
+    "studio": "remotion studio src/index.ts"
+  },
+  "dependencies": {
+    "@react-three/fiber": "9.8.2",
+    "@react-three/drei": "10.7.9",
+    "@react-three/rapier": "2.2.0",
+    "@react-three/postprocessing": "3.2.1",
+    "@remotion/cli": "4.0.537",
+    "@remotion/three": "4.0.537",
+    "postprocessing": "6.39.5",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "remotion": "4.0.537",
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.2",
+    "@types/three": "0.180.0",
+    "typescript": "5.9.3"
+  }
+}

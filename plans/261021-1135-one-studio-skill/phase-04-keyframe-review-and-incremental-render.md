@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: Keyframe review & incremental render
-status: pending
+status: done
 depends_on: [3]
 ---
 
@@ -26,3 +26,8 @@ User duyệt frame mẫu trước khi render; thêm/sửa scene chỉ render l�
 ## Done khi
 - Thêm 1 scene vào video 4 scene → chỉ 1 lần render, 4 clip cũ giữ nguyên hash, concat ra video 5 scene.
 - Sửa brand.version → script báo "5 scene sẽ render lại" và hỏi user.
+
+## Kết quả (2026-10-21)
+- `keyframe-stills.mjs` (contact sheet có nhãn, chỉ scene thay đổi), `status.mjs --approve-scenes`, `render-changed-scenes.mjs` (chặn scene chưa duyệt, exit 2), `concat-and-mix.mjs` (stream copy). Gate 5–10 dùng hash scene/audio; sửa scene chỉ mở lại scene đó.
+- Thêm 1 scene → đúng 1 lần render (E2E). Clip của mọi engine được chuẩn hoá về một kiểu encode.
+- Khác plan: `concat-and-mix` viết bằng Node (.mjs) thay cho .sh để chạy được trên Windows.

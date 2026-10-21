@@ -1,7 +1,7 @@
 ---
 phase: 6
 title: Explainer (anatomy), character (lemo-opuscar), 3D
-status: pending
+status: done
 depends_on: [4]
 ---
 
@@ -25,3 +25,9 @@ Các loại scene đặc biệt, chỉ nạp khi storyboard cần.
 
 ## Done khi
 - Storyboard có 1 scene explainer + 1 character + 1 3D → render, QA và concat được với scene 2D, không lệch fps/size.
+
+## Kết quả (2026-10-21)
+- 3D mặc định three.js trong HyperFrames (đã kiểm); Remotion + R3F chỉ khi `three.physics`/`three.postfx` (`new-remotion.mjs`, đã render thật).
+- Explainer: `anatomy-to-svg.mjs` tách figure anatomy thành SVG có CSS khoanh vùng, animate `data-part` bằng GSAP (đã render với ví dụ dial-indicator).
+- Character: scene lemo theo hợp đồng trang, render qua `core/render/video.mjs` rồi chuẩn hoá (đã render).
+- `check-external.mjs` kiểm tra và in lệnh cài cho anatomy, lemo, remotion, hyperframes, ffmpeg.

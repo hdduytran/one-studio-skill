@@ -1,0 +1,15 @@
+  <div class="os-frame os-center clip" data-start="0" data-duration="{{duration}}" data-track-index="0">
+    <div class="os-media" id="anim" style="height: 50%"></div>
+    <h2 class="os-h2">{{headline}}</h2>
+  </div>
+</div>
+<script src="../assets/lottie/{{lottie_name}}.js"></script>
+<script>
+  const S = OS.scene("{{id}}");
+  S.lottie("#anim", window.LOTTIE["{{lottie_name}}"], { loop: true });
+  S.enter("#anim", { at: 0, kind: "scale" });
+  S.words(".os-h2", { at: 0.8 });
+  S.done();
+</script>
+</body>
+</html>

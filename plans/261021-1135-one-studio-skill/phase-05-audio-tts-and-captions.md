@@ -1,7 +1,7 @@
 ---
 phase: 5
 title: Audio, TTS & captions
-status: pending
+status: done
 depends_on: [4]
 ---
 
@@ -26,3 +26,8 @@ VO theo từng câu qua API OpenAI-compatible, khớp duration scene, nhạc n�
 - Script VI 6 câu → 6 file audio, captions.srt đúng timing (lệch < 100ms so với audio).
 - Sửa 1 câu → 1 lần gọi TTS, 1 scene render lại.
 - Output đo loudness ≈ -14 LUFS.
+
+## Kết quả (2026-10-21)
+- `build-audio.mjs` (TTS theo câu, cache, hỏi trước khi gọi, khớp thời lượng scene mà vẫn giữ duyệt), `lib/captions.mjs` (SRT), `tts-openai-compatible.mjs --probe/--say`, trộn nhạc có ducking + loudnorm hai lượt.
+- Kiểm bằng server giả lập: phụ đề lệch ≤ 20 ms, −13.9 LUFS, sửa 1 câu → 1 lần gọi.
+- **Pending:** gọi thật ZeroTTS / OmniVoice trên máy user.

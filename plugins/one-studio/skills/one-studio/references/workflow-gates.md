@@ -50,29 +50,37 @@ Marks printed by status: `✓` done · `→` current · `!` input changed after 
 
 ## 5 · Keyframe review — approval per scene
 
-- **Do:** build each scene just far enough to render 1–3 stills (start, middle, end), then make a contact sheet in `D/review/`.
-- **Ask:** show the sheet; note any scene you are unsure about. The user approves scenes individually.
-- **Close:** approved scenes record their hash; a later edit to a scene clears its approval.
+- **Do:** `prepare-project.mjs D` (runtime, fonts, brand CSS, vendored libs) → `new-scene.mjs D --all` (templates per type; lemo scenes get a folder; Remotion scenes: `new-remotion.mjs D`) → write each scene (read its type reference first) → `keyframe-stills.mjs D` (only changed/unapproved scenes) → look at `review/sheet.jpg` yourself, fix, re-run for those ids.
+- **Ask:** show the sheet path (and the image if the client can display it), list scenes you are unsure about: "Bạn duyệt các scene này chứ? Scene nào cần sửa?"
+- **Close:** `status.mjs D --approve-scenes s01,s02` for the approved ones (or `all`), then `--approve keyframes` once every scene is approved. A later edit to a scene clears only its approval.
 
-## 6 · Build scenes
+## 6 · Build
 
-- Load the reference for each scene type once (router in SKILL.md). One file per scene in `D/scenes/`, brand tokens only. Lint every scene before render.
+- `render-changed-scenes.mjs D --preview`: renders low-res clips for approved scenes whose hash changed; unchanged scenes are cached; unapproved scenes are blocked (exit 2).
+- **Close:** `--approve build` (checks every scene has a current preview clip).
 
 ## 7 · Audio
 
-- Ask before the first TTS call of the project if `services.tts` is not true. One call per sentence, cached by text + voice + model. Scene duration = max(planned, VO + padding). Music only if the user gives a file or asks.
+- `build-audio.mjs D --dry-run` → number of TTS calls. If `services.tts` is not true, ask once; then `build-audio.mjs D --allow-tts`.
+- It fits scene lengths to the VO (keeps approvals), writes `audio/vo.wav`, `captions.srt`, `audio/manifest.json`. If scenes got longer, re-run gate 6 for them (`render-changed-scenes --preview`).
+- Optional: sync on-screen reveals to `audio/manifest.json → scenes[].lines[].start`, re-run stills for the scenes you touched.
+- **Close:** `--approve audio`.
 
 ## 8 · Preview — approval
 
-- Low-res (540p) full cut with VO and captions. Ask for OK or a list of scene fixes.
+- `render-changed-scenes.mjs D --preview` then `concat-and-mix.mjs D --preview` → `out/<name>-preview.mp4` (540p, VO, music, captions, −14 LUFS).
+- **Ask:** send the path; collect scene-level fixes. Fixes → back to gate 5 for those scenes only.
+- **Close:** after OK → `--approve preview`.
 
 ## 9 · Render
 
-- Estimate again (only changed scenes count). Render scenes whose hash changed, normalise, concat with stream copy, mix audio, loudnorm −14 LUFS, captions.
+- `status.mjs D --estimate` (render time), `render-changed-scenes.mjs D` (final clips; same approvals), `concat-and-mix.mjs D` → `out/<name>.mp4` + `.srt`. Check the printed duration, size and LUFS.
+- **Close:** `--approve render`.
 
 ## 10 · Publish
 
-- Extra aspect ratios from `studio.json → format.exports`, thumbnail, manifest of what was delivered. Tell the user the output paths.
+- `publish.mjs D` → extra ratios from `format.exports`, thumbnails, `out/manifest.json` (see `references/series-publish.md`). Look at each `out/<ratio>/sheet.jpg`.
+- **Close:** `--approve publish`, tell the user the output paths. For a series, offer `series-bumper.mjs` if the intro/outro should be reused.
 
 ---
 

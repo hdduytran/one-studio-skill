@@ -10,8 +10,8 @@
     "muted": "#8a90a0"
   },
   "typography": {
-    "heading": { "family": "Inter", "weight": 700, "fallback": "system-ui, sans-serif" },
-    "body": { "family": "Inter", "weight": 400, "fallback": "system-ui, sans-serif" },
+    "heading": { "family": "Inter", "weight": 700, "fontsource": "inter@5.2.8", "fallback": "system-ui, sans-serif" },
+    "body": { "family": "Inter", "weight": 400, "fontsource": "inter@5.2.8", "fallback": "system-ui, sans-serif" },
     "mono": { "family": "JetBrains Mono", "weight": 500, "fallback": "ui-monospace, monospace" },
     "scale": { "display": 120, "h1": 88, "h2": 64, "body": 40, "caption": 44, "small": 28 }
   },
