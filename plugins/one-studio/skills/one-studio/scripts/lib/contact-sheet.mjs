@@ -16,6 +16,7 @@ export function findFont() {
   }
 }
 
+const SHEET_TIMEOUT_MS = 120_000;
 const esc = (s) => s.replace(/\\/g, "\\\\").replace(/:/g, "\\:").replace(/'/g, "\\'");
 
 // One row per scene: its stills side by side, labelled "<id> · <t>s".
@@ -39,6 +40,6 @@ export function contactSheet(rows, out, { tileWidth = 480 } = {}) {
     filters.push(cols > 1 ? `${cells.join("")}hstack=inputs=${cols}[r${ri}]` : `${cells[0]}null[r${ri}]`);
   });
   filters.push(rows.length > 1 ? `${rows.map((_, i) => `[r${i}]`).join("")}vstack=inputs=${rows.length}[out]` : "[r0]null[out]");
-  run("ffmpeg", ["-y", "-v", "error", ...inputs, "-filter_complex", filters.join(";"), "-map", "[out]", "-frames:v", "1", "-q:v", "3", out]);
+  run("ffmpeg", ["-nostdin", "-y", "-v", "error", ...inputs, "-filter_complex", filters.join(";"), "-map", "[out]", "-frames:v", "1", "-q:v", "3", out], { timeout: SHEET_TIMEOUT_MS });
   return out;
 }

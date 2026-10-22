@@ -17,6 +17,7 @@ Hoặc từ bản clone: `claude plugin marketplace add ./` rồi `claude plugin
 | Node.js ≥ 20 | ✓ | chạy mọi script (≥ 22 cho `capture-screen.mjs`) |
 | FFmpeg + FFprobe | ✓ | ghép, trộn âm, phụ đề, loudnorm. Thiếu libass (FFmpeg 8 của Homebrew) → phụ đề "in cứng" tự chuyển sang phụ đề mềm; thiếu drawtext → contact sheet không có nhãn |
 | Chrome Headless Shell | ✓ | `npx hyperframes@0.8.181 browser ensure`, hoặc đặt `HYPERFRAMES_BROWSER_PATH` |
+| yt-dlp | chỉ khi lấy style từ link | `brew install yt-dlp` hoặc `pipx install yt-dlp`; skill không tự cài. File video có sẵn thì không cần |
 | Python 3 | khi dùng file `.lottie` | đọc zip |
 | Server TTS OpenAI-compatible | khi có giọng đọc | ZeroTTS (tiếng Việt, danh sách giọng ở `/v1/audio/voices`), OmniVoice (ngôn ngữ khác) |
 | anatomy skill | scene `explainer` | `npx skills add wheresryan22/anatomy -g -a claude-code` |
@@ -34,7 +35,8 @@ Hoặc từ bản clone: `claude plugin marketplace add ./` rồi `claude plugin
 | `ONE_STUDIO_LEMO_LIB`, `PLAYWRIGHT_CHROME` | thư viện lemo-opuscar và Chrome của nó |
 | `ONE_STUDIO_ANATOMY` | thư mục anatomy nếu không cài dạng skill |
 | `ONE_STUDIO_CHROME`, `ONE_STUDIO_REMOTION_GL` | Chrome và WebGL backend cho Remotion |
-| `ONE_STUDIO_CACHE` | cache npm của GSAP/howler/three/lottie/font (mặc định `~/.cache/one-studio`) |
+| `ONE_STUDIO_CACHE` | cache npm của GSAP/howler/three/lottie/font và preset lưu từ video (`presets/`); mặc định `~/.cache/one-studio` |
+| `ONE_STUDIO_YTDLP` | đường dẫn tới `yt-dlp` nếu không nằm trong PATH |
 
 ## Dùng
 
@@ -54,6 +56,28 @@ Gõ `/one-studio` kèm yêu cầu, ví dụ `/one-studio làm video 40 giây gi�
 | 10 Publish | `publish.mjs [--ratios 9:16,1:1] [--thumb-frame s02@3.5]` |
 
 Công cụ khác: `script-lint.mjs`, `seam-check.mjs`, `capture-screen.mjs`, `validate.mjs`, `brand-to-css.mjs`, `optimize-assets.mjs`, `anatomy-to-svg.mjs`, `new-remotion.mjs`, `series-bumper.mjs`, `make-sfx.mjs`, `sync-lines.mjs`, `tts-openai-compatible.mjs --probe | --voices | --samples all | --use-voice <id>`, `check-external.mjs`.
+
+## Lấy style từ video
+
+Đưa một file video hoặc link, one-studio đo nhịp cắt, màu, chuyển động, âm thanh, rồi Claude xem 2 contact sheet để đọc phông, bố cục, giọng điệu. Kết quả là một style card (`style-refs/<slug>/style.json` + `STYLE.md`), cùng bảng so sánh: khung gốc ở hàng trên, 3 scene mẫu (tiêu đề, biểu đồ, phụ đề) dựng theo style ở hàng giữa, bảng màu ở hàng dưới. Bạn xem, nhờ chỉnh nhiều vòng, đồng ý rồi mới áp vào `brand.json`. Gọi bằng `/one-studio lấy style từ <link hoặc file>` (gate 0).
+
+| Lệnh | Việc |
+|---|---|
+| `style-fetch.mjs <dir> <url\|file> [--from 0:00] [--to 1:30] [--max 90] [--keep]` | lấy video (mặc định 90 giây đầu) |
+| `style-analyze.mjs <dir> <slug>` | đo bằng FFmpeg, ra `metrics.json` + 2 contact sheet |
+| `style-draft.mjs <dir> <slug>` | ghép số đo và phần Claude đọc thành `style.json` |
+| `style-compare.mjs <dir> <slug> [--variant v] [--ratio 9:16]` | sheet so sánh, không render video |
+| `style-enhance.mjs <dir> <slug> [--accept 1,3] [--reject 2]` | đề xuất cải tiến kèm lý do và ảnh trước/sau; chỉ áp khi bạn nhận |
+| `style-set.mjs <dir> <slug> key=value … [--lock key]`, `style-diff.mjs`, `style-editor.mjs` | chỉnh qua chat hoặc trang `review/style-editor.html` (offline) |
+| `style-merge.mjs <dir> <a> <b> … --as <slug>` | gộp nhiều video thành một style |
+| `style-apply.mjs <dir> <slug> [--variant v] [--as-preset tên] [--keep] [--dry-run] [--allow-low-contrast]` | ghi vào `brand.json` (tăng `version`), `studio.json → story.style`, gợi ý storyboard/audio |
+
+- **Đồng ý của bạn:** link chỉ được tải khi `studio.json → services.download: true` (Claude hỏi một lần). Không tự cài yt-dlp, không dùng cookies trình duyệt. File có sẵn thì không cần gì.
+- **Nền tảng:** YouTube, TikTok, Facebook, Instagram qua yt-dlp. Video riêng tư, cần đăng nhập hoặc giới hạn tuổi (hay gặp ở Facebook và Instagram) thì dừng lại, bạn tự tải rồi đưa file. TikTok và Instagram đôi khi chặn tải; đưa file là cách chắc nhất.
+- **Không bao giờ lấy:** khung hình, logo, linh vật, nhân vật, slogan và chữ trên hình, nhạc, giọng, tên tác giả. Chỉ lấy cách trình bày (màu, phông gần nhất, nhịp, chuyển cảnh, kiểu phụ đề, loudness). Nhạc chỉ gợi ý bản nền gần nhất có sẵn. Video gốc nằm trong `style-refs/` (git bỏ qua) và bị xoá sau khi áp, trừ khi dùng `--keep`.
+- **Enhance và customize:** style gồm các lớp, lớp sau thắng: số đo < đề xuất đã nhận < chỉnh của bạn (có thể khoá) < biến thể sáng/tối. Trích lại hay gộp không ghi đè phần bạn đã chỉnh hoặc khoá. Style luôn đạt WCAG AA cho chữ chính; nếu không, `style-apply` từ chối (đổi màu hoặc nhận đề xuất `contrast`, hoặc `--allow-low-contrast` nếu bạn chắc).
+- **Preset:** `--as-preset tên` lưu look vào `$ONE_STUDIO_CACHE/presets/<tên>.json` (mặc định `~/.cache/one-studio/presets/`). Preset đó hiện trong `compare-presets.mjs` và `init-project.mjs --preset`; preset có sẵn của plugin không bao giờ bị ghi đè.
+- `status.mjs` hiện style đang dùng và đánh dấu `!` khi style card đổi sau lần áp; `validate.mjs` kiểm `story.style` trỏ tới style có thật.
 
 ## Viết kịch bản: writers-room
 
@@ -95,7 +119,7 @@ Scene `screen` dùng video thật quay từ một trang web theo kịch bản tr
 - **Duyệt trước khi render:** scene chỉ được render khi keyframe của đúng phiên bản đó đã được duyệt. Sửa scene thì chỉ scene đó phải duyệt lại.
 - **Audio:** mỗi câu là một lần gọi TTS và được cache. Giọng đọc chọn bằng tai: nghe mẫu từng giọng của server rồi chọn. Scene tự kéo dài cho khớp giọng đọc, và chữ gắn `data-line` hiện đúng lúc câu đó được đọc, mà vẫn giữ trạng thái đã duyệt. Phụ đề tính từ thời lượng audio thật, không cần Whisper; bạn chọn không phụ đề, chỉ `.srt`, phụ đề mềm hoặc in cứng.
 - **Nhạc & SFX:** nhạc nền tổng hợp offline (`ambient`, `lofi`… loop liền mạch, chỉnh BPM/giọng/độ dài) hoặc file của bạn; bộ SFX (whoosh, pop, ding, riser, impact…) đặt theo từng scene trong storyboard. Trang `review/audio-picker.html` (howler.js, chạy local) để nghe thử giọng, nhạc, SFX cạnh nhau. Bản trộn cuối luôn do FFmpeg làm: −14 LUFS, nhạc tự giảm khi có giọng đọc.
-- **Giao diện:** 8 preset (`apple-light`, `apple-keynote`, `neon-terminal`, `synthwave`, `ocean-calm`, `warm-editorial`, `swiss-mono`, `default`), so sánh trên cùng các scene bằng một contact sheet; bề mặt kính mờ kiểu macOS (`brand.json → surface: "glass"`).
+- **Giao diện:** 9 preset (`apple-light`, `apple-keynote`, `neon-terminal`, `synthwave`, `ocean-calm`, `warm-editorial`, `swiss-mono`, `infinity-board`, `default`) cộng preset bạn lưu từ video, so sánh trên cùng các scene bằng một contact sheet; bề mặt kính mờ kiểu macOS (`brand.json → surface: "glass"`).
 - **Nhiều tỉ lệ:** keyframe 9:16 / 1:1 được chụp ngay ở gate 5. CSS riêng cho một tỉ lệ (`<style data-ratio="9:16">`) chỉ làm render lại tỉ lệ đó.
 - **Engine:** HyperFrames (HTML/GSAP) là mặc định, kể cả canvas, Lottie và three.js. Remotion chỉ dùng cho 3D có physics hoặc post-processing. anatomy được xuất SVG tĩnh rồi animate bằng GSAP. lemo-opuscar render ra clip riêng.
 

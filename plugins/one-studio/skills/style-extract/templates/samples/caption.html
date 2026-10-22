@@ -1,0 +1,32 @@
+  <div class="os-frame os-center clip" data-start="0" data-duration="{{duration}}" data-track-index="0">
+    <p class="os-h2">Một ý chính trên mỗi cảnh</p>
+    <p class="os-body os-muted">Phụ đề đọc được ngay cả khi tắt tiếng</p>
+  </div>
+  <div class="sample-caption clip" data-start="0" data-duration="{{duration}}" data-track-index="1"></div>
+</div>
+<style>
+  .sample-caption {
+    position: absolute; left: 50%; transform: translateX(-50%); max-width: 80%; text-align: center;
+    padding: calc(12 * var(--u)) calc(28 * var(--u)); border-radius: calc(10 * var(--u));
+    font-size: calc(var(--caption-size) * var(--u)); color: var(--caption-color); background: var(--caption-bg);
+  }
+</style>
+<script>
+  // The line follows brand.captions: font, position and the width cap (max_chars).
+  const cap = (window.BRAND && window.BRAND.captions) || {};
+  const el = document.querySelector(".sample-caption");
+  el.textContent = "Phụ đề hiển thị đúng phong cách của video";
+  if (cap.font) el.style.fontFamily = '"' + cap.font + '", var(--font-body)';
+  if (cap.max_chars) el.style.maxWidth = cap.max_chars + "ch";
+  const pos = cap.position || "bottom";
+  if (pos === "top") el.style.top = "calc(var(--h) * 0.1)";
+  else if (pos === "middle") { el.style.top = "50%"; el.style.transform = "translate(-50%, -50%)"; }
+  else el.style.bottom = "calc(var(--h) * 0.08)";
+  const S = OS.scene("{{id}}");
+  S.enter(".os-h2", { at: 0.2 });
+  S.enter(".os-body", { at: 0.6, kind: "fade" });
+  S.enter(".sample-caption", { at: 1.0, kind: "up" });
+  S.done();
+</script>
+</body>
+</html>

@@ -12,6 +12,7 @@ import { CAPTION_MODES, captionMode, captionSetting } from "./lib/captions.mjs";
 import { hasLibass } from "./lib/ffmpeg.mjs";
 import { currentGate, gateProblems, gateState } from "./lib/gates.mjs";
 import { sceneHash, sceneSourceExists } from "./lib/hash.mjs";
+import { styleInUse } from "./lib/style-refs.mjs";
 import { estimate, formatEstimate } from "./lib/estimate.mjs";
 import { formatViolation, lintProject } from "./script-lint.mjs";
 
@@ -118,6 +119,7 @@ function summary(project) {
     ttsAllowed: Boolean(studio.services?.tts),
     captions: { chosen: captionSetting(project), effective: captionMode(project, { libass: hasLibass() }) },
     music: studio.audio?.music ?? null,
+    style: styleInUse(project),
     series: studio.meta.series,
     episode: studio.meta.episode,
     brand: brand ? { name: brand.name, version: brand.version, path: project.brandPath } : null,
@@ -138,6 +140,11 @@ function printSummary(s) {
   else console.log("  brand: MISSING");
   if (s.tts) console.log(`  voice ${s.tts.model} @ ${s.tts.base_url}, voice "${s.tts.voice}"${s.ttsAllowed ? "" : " (not confirmed: ask before the first TTS call)"}`);
   console.log(`  captions ${s.captions.chosen}${s.captions.effective !== s.captions.chosen ? ` → ${s.captions.effective} on this machine (no libass)` : ""} · music ${s.music === false ? "none (user choice)" : s.music ?? "not chosen yet (gate 7 asks)"}`);
+  if (s.style) {
+    const st = s.style;
+    const note = st.missing ? "missing in style-refs/" : st.changed ? "the style card changed after it was applied: re-run style-compare, then style-apply (ask the user)" : "";
+    console.log(`  ${st.missing || st.changed ? "!" : " "} style ${st.slug}${st.variant ? ` (variant ${st.variant})` : ""}${note ? ` · ${note}` : ""}`);
+  }
   if (s.brandStale) console.log("  ⚠ brand version changed since last render: every scene will re-render (ask the user)");
   console.log("Gates:");
   for (const g of s.gates) {

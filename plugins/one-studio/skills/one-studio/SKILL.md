@@ -35,7 +35,7 @@ Gate 0 asks, in ONE message, only what is missing (defaults in brackets):
 - new video or episode of a series? (existing series → brand, voice, format, intro/outro reused: ask nothing about them)
 - 2D, 3D or mixed? [2D] · aspect ratio(s) and length? [16:9, 30–60 s]
 - voice-over language? [the user's] — `vi` → ZeroTTS, others → OmniVoice (local, OpenAI-compatible); confirm base URL once; the voice is picked by ear (samples + `audio-picker`), never left at `default`
-- brand colours/fonts/logo, a preset (`apple-light`, `apple-keynote`, `neon-terminal`, `synthwave`, `ocean-calm`, `warm-editorial`, `swiss-mono`, `infinity-board`), or defaults? · allowed paid/remote services? [none]
+- brand colours/fonts/logo, a preset (`apple-light`, `apple-keynote`, `neon-terminal`, `synthwave`, `ocean-calm`, `warm-editorial`, `swiss-mono`, `infinity-board`, plus any saved from an earlier style: `init-project.mjs --help` lists every name), **or the style of an existing video/link** ("lấy style từ video/link" → load `../style-extract/SKILL.md`, it fills `brand.json` and `studio.json → story.style`), or defaults? · allowed paid/remote services? [none]
 - captions? none · .srt only · soft track · burned in [burn; mux when FFmpeg has no libass]
 
 Then `node "$S/scripts/init-project.mjs" <dir> --title "…" --lang vi --dimension 2d --aspect 16:9 --duration 45 [--exports 16:9,9:16] [--preset …] [--captions …] [--tts-url … --probe-tts] [--series <name>]`, write remaining answers into `brand.json` and `studio.json → audio.tts`. Exact wording: `references/workflow-gates.md`.

@@ -6,6 +6,7 @@
 import { existsSync, statSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { screenErrors } from "./lib/flow.mjs";
+import { storyStyleErrors, styleProjectResults } from "./lib/style-refs.mjs";
 import { crossCheck, loadProject, parseArgs, readJson, validateKind } from "./lib/project.mjs";
 
 const KINDS = ["studio", "storyboard", "brand"];
@@ -50,7 +51,8 @@ function validateProject(dir, results) {
     results.push({ file: project.storyboardPath, errors: validateKind("storyboard", project.storyboard) });
   }
   if (project.brand) results.push({ file: project.brandPath, errors: validateKind("brand", project.brand) });
-  results.push({ file: `${join(project.root)} (cross-file)`, errors: [...crossCheck(project), ...screenErrors(project)] });
+  results.push(...styleProjectResults(project));
+  results.push({ file: `${join(project.root)} (cross-file)`, errors: [...crossCheck(project), ...screenErrors(project), ...storyStyleErrors(project)] });
 }
 
 function fail(msg) {

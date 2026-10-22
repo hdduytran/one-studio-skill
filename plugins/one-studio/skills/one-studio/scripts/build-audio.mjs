@@ -120,15 +120,17 @@ export async function buildAudio(dir, { allowTts = false, dryRun = false, log = 
   const total = r3(t);
 
   // VO track: every sentence delayed to its absolute start, summed, padded to the full length.
+  // The pad is bounded (whole_dur) and the output capped (-t): an open-ended apad followed by atrim
+  // sometimes never reaches EOF on FFmpeg 8 and the process spins forever.
   const vo = join(project.root, "audio", "vo.wav");
   if (placed.length) {
     const inputs = placed.flatMap((p) => ["-i", p.file]);
     const graph = placed.map((p, i) => `[${i}:a]adelay=${Math.round(p.at * 1000)}:all=1[d${i}]`).join(";") +
-      `;${placed.map((_, i) => `[d${i}]`).join("")}amix=inputs=${placed.length}:normalize=0:dropout_transition=0,apad,atrim=0:${total}[vo]`;
+      `;${placed.map((_, i) => `[d${i}]`).join("")}amix=inputs=${placed.length}:normalize=0:dropout_transition=0,apad=whole_dur=${total},atrim=0:${total}[vo]`;
     mkdirSync(join(project.root, ".one-studio"), { recursive: true });
     const script = join(project.root, ".one-studio", "vo-graph.txt");
     writeFileSync(script, graph);
-    run("ffmpeg", ["-y", "-v", "error", ...inputs, "-filter_complex_script", script, "-map", "[vo]", "-ac", "1", "-ar", String(SAMPLE_RATE), "-c:a", "pcm_s16le", vo]);
+    run("ffmpeg", ["-nostdin", "-y", "-v", "error", ...inputs, "-filter_complex_script", script, "-map", "[vo]", "-ac", "1", "-ar", String(SAMPLE_RATE), "-c:a", "pcm_s16le", "-t", String(total), vo]);
   }
 
   // The user may have chosen no captions at all (gate 0 / gate 7): then there is no .srt to keep in sync.

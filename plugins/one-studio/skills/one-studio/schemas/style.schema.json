@@ -1,0 +1,372 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "one-studio/style.schema.json",
+  "title": "one-studio extracted style card",
+  "description": "Style read from a reference video: a partial brand.json patch plus storyboard/writing/audio hints. Every field is accounted for in `provenance`. No asset of the source video is stored here.",
+  "type": "object",
+  "required": [
+    "version",
+    "slug",
+    "reference",
+    "brand",
+    "provenance"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Bump on every change to the card."
+    },
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "reference": {
+      "type": "object",
+      "required": [
+        "file",
+        "accessed",
+        "range"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "type": "string",
+          "pattern": "^https?://"
+        },
+        "file": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Source file relative to style-refs/<slug>/."
+        },
+        "title": {
+          "type": "string"
+        },
+        "channel": {
+          "type": "string"
+        },
+        "accessed": {
+          "type": "string",
+          "description": "ISO date the reference was fetched."
+        },
+        "range": {
+          "type": "object",
+          "required": [
+            "from",
+            "to"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "from": {
+              "type": "number",
+              "minimum": 0
+            },
+            "to": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "description": "Analysed span in seconds."
+        }
+      }
+    },
+    "brand": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Partial patch of brand.json (same shapes, nothing required). Merged over the project brand by style-apply.",
+      "properties": {
+        "colors": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/color"
+          },
+          "properties": {
+            "bg": {
+              "$ref": "#/$defs/color"
+            },
+            "fg": {
+              "$ref": "#/$defs/color"
+            },
+            "primary": {
+              "$ref": "#/$defs/color"
+            },
+            "secondary": {
+              "$ref": "#/$defs/color"
+            },
+            "accent": {
+              "$ref": "#/$defs/color"
+            },
+            "muted": {
+              "$ref": "#/$defs/color"
+            }
+          }
+        },
+        "surface": {
+          "enum": [
+            "flat",
+            "glass"
+          ]
+        },
+        "typography": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "heading": {
+              "$ref": "#/$defs/font"
+            },
+            "body": {
+              "$ref": "#/$defs/font"
+            },
+            "mono": {
+              "$ref": "#/$defs/font"
+            },
+            "scale": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "number",
+                "minimum": 1
+              }
+            }
+          }
+        },
+        "motion": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "ease": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "duration": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "stagger": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        },
+        "transitions": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "default": {
+              "$ref": "#/$defs/transitionKind"
+            },
+            "duration": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        },
+        "captions": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "font": {
+              "type": "string"
+            },
+            "size": {
+              "type": "number",
+              "minimum": 1
+            },
+            "color": {
+              "$ref": "#/$defs/color"
+            },
+            "background": {
+              "type": "string"
+            },
+            "position": {
+              "enum": [
+                "bottom",
+                "top",
+                "middle"
+              ]
+            },
+            "max_chars": {
+              "type": "integer",
+              "minimum": 10
+            }
+          }
+        }
+      }
+    },
+    "storyboard": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "target_shot_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "visual_modes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
+          "uniqueItems": true
+        },
+        "camera": {
+          "type": "string"
+        },
+        "sfx_density": {
+          "enum": [
+            "none",
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "intro": {
+          "type": "string"
+        },
+        "outro": {
+          "type": "string"
+        }
+      }
+    },
+    "writing": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "tone": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "hook": {
+          "type": "string"
+        },
+        "words_per_minute": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "audio": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "lufs": {
+          "type": "number",
+          "maximum": 0
+        },
+        "silence_ratio": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "has_voice": {
+          "type": "boolean"
+        },
+        "music": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Nearest built-in bed (lib/music.mjs); the reference track itself is never reused.",
+          "properties": {
+            "preset": {
+              "type": "string"
+            },
+            "mood": {
+              "type": "string"
+            },
+            "bpm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        }
+      }
+    },
+    "do_not_copy": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Logos, mascots, characters, slogans, music seen or heard in the video."
+    },
+    "provenance": {
+      "type": "object",
+      "description": "Dotted field path (e.g. brand.colors.primary) -> how it was obtained.",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "source"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "source": {
+            "enum": [
+              "measured",
+              "seen",
+              "guessed"
+            ]
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "color": {
+      "type": "string",
+      "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+    },
+    "font": {
+      "type": "object",
+      "required": [
+        "family"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "weight": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 900
+        },
+        "src": {
+          "type": "string"
+        },
+        "fallback": {
+          "type": "string"
+        },
+        "fontsource": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+@\\d+\\.\\d+\\.\\d+$"
+        }
+      }
+    },
+    "transitionKind": {
+      "enum": [
+        "cut",
+        "fade",
+        "slide-left",
+        "slide-up",
+        "wipe",
+        "zoom",
+        "blur"
+      ]
+    }
+  }
+}
