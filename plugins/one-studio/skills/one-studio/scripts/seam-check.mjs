@@ -20,9 +20,15 @@ export const DEFAULT_THRESHOLD = 0.02;
 export function imageDifference(a, b) {
   const r = run("ffmpeg", ["-v", "error", "-i", a, "-i", b, "-filter_complex",
     "[0:v][1:v]blend=all_mode=difference,format=gray,signalstats,metadata=mode=print:key=lavfi.signalstats.YAVG:file=-", "-f", "null", "-"]);
-  const m = /lavfi\.signalstats\.YAVG=([\d.]+)/.exec(r.stdout);
-  if (!m) throw new Error(`could not measure the difference between ${a} and ${b}`);
-  return Number(m[1]) / 255;
+  const yavg = parseYavg(r.stdout);
+  if (yavg == null) throw new Error(`could not measure the difference between ${a} and ${b}`);
+  return yavg / 255;
+}
+
+// The first YAVG value printed by FFmpeg's signalstats. Tiny averages come in exponent form (9.6e-06).
+export function parseYavg(stdout) {
+  const m = /lavfi\.signalstats\.YAVG=([\d.]+(?:e[-+]?\d+)?)/i.exec(stdout);
+  return m ? Number(m[1]) : null;
 }
 
 // pairs: [{ a, b, kind }] (default: every same-world and handoff pair). Returns { rows, sheet, failed }.
