@@ -50,7 +50,7 @@ Gõ `/one-studio` kèm yêu cầu, ví dụ `/one-studio làm video 40 giây gi�
 | 3–4 Storyboard, ước tính | chọn mode/world/camera, `status.mjs <dir> [--estimate] [--approve <gate>]` |
 | 5 Keyframe | `prepare-project.mjs`, `new-scene.mjs`, `capture-screen.mjs` (scene `screen`), `keyframe-stills.mjs` (cả các tỉ lệ xuất, kèm `review/seams.jpg`), `seam-check.mjs`, `compare-presets.mjs`, `status.mjs --approve-scenes` |
 | 6 Build | `render-changed-scenes.mjs --preview` |
-| 7 Audio | `make-music.mjs --samples`, `audio-picker.mjs`, `make-music.mjs --use <nhạc\|none>`, `status.mjs --captions <mode>`, `build-audio.mjs [--allow-tts]` |
+| 7 Audio | `make-music.mjs --samples`, `audio-picker.mjs`, `make-music.mjs --use <nhạc\|none>`, `status.mjs --captions <mode>`, `build-audio.mjs [--allow-tts]`, `build-audio.mjs --tighten [--apply]` (rút ngắn scene theo giọng đọc thật, phải duyệt lại storyboard) |
 | 8 Preview | `concat-and-mix.mjs --preview` |
 | 9 Render | `render-changed-scenes.mjs`, `concat-and-mix.mjs` |
 | 10 Publish | `publish.mjs [--ratios 9:16,1:1] [--thumb-frame s02@3.5]` |

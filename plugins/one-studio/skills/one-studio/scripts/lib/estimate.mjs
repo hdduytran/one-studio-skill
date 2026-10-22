@@ -5,6 +5,18 @@ import { sceneHash, sceneSourceExists } from "./hash.mjs";
 import { join } from "node:path";
 import { SCENE_TYPES, SKILL_DIR, sceneEngine } from "./project.mjs";
 import { captureFiles } from "./flow.mjs";
+import { formatRate, speechRate, wordCount } from "./speech-rate.mjs";
+
+// Seconds a scene needs for its sentences at the voice's rate, with the audio step's default lead-in, pauses, padding.
+function speechSeconds(project, scene, wps) {
+  const a = project.studio.audio ?? {};
+  const lines = scene.lines ?? [];
+  if (!lines.length) return 0;
+  const words = lines.reduce((n, l) => n + wordCount(l.say ?? l.text), 0);
+  const pauses = lines.slice(0, -1).reduce((n, l) => n + (l.pause_after ?? a.sentence_pause ?? 0.25), 0);
+  return (a.lead_in ?? 0.3) + words / wps + pauses + (a.scene_padding ?? 0.5);
+}
+const DEAD_AIR = 2.5; // planned seconds beyond the speech that are worth a warning
 
 // Tokens Claude spends writing + fixing one scene, by cost level [low, high].
 export const LEVEL_TOKENS = { low: [2000, 4000], medium: [5000, 9000], high: [15000, 30000] };
@@ -32,7 +44,11 @@ export function estimate(project) {
   let ttsLines = 0;
   let ttsChars = 0;
 
+  const rate = speechRate(project);
+  const slack = [];
   for (const scene of sb.scenes) {
+    const speak = speechSeconds(project, scene, rate.wps);
+    if (speak && scene.duration - speak > DEAD_AIR) slack.push(`${scene.id} ${scene.duration}s vs ~${Math.round(speak * 10) / 10}s of speech`);
     const info = SCENE_TYPES[scene.type];
     const state = states.get(scene.id);
     const hash = sceneSourceExists(project, scene) ? sceneHash(project, scene) : null;
@@ -84,6 +100,9 @@ export function estimate(project) {
   if (build.length > warnScenes) warnings.push(`${build.length} scenes to build (> ${warnScenes}): consider trimming or splitting`);
   const heavy = [...new Set(build.map((r) => r.type).filter((t) => (credit.warn_types ?? ["3d", "character"]).includes(t)))];
   if (heavy.length) warnings.push(`heavy scene types: ${heavy.join(", ")} (high token cost, slower render)`);
+  if (slack.length) {
+    warnings.push(`planned longer than the voice-over at ${formatRate(rate)}: ${slack.join(", ")}. Shorten in storyboard.json now (VO + 1–1.5 s + scripted silence), or after the first build with build-audio.mjs --tighten`);
+  }
   if (sb.scenes.some((s) => s.type === "explainer" && s.explainer?.size === "hero")) {
     warnings.push("explainer size 'hero' takes 2–4 h of work per anatomy's own sizing");
   }
@@ -100,6 +119,7 @@ export function estimate(project) {
     renderSeconds: rows.reduce((n, r) => n + r.renderSeconds, 0) + flows.size * CAPTURE_SECONDS,
     services,
     warnings,
+    rate,
   };
 }
 
@@ -120,6 +140,7 @@ export function formatEstimate(e) {
   out.push(`Keyframe review images: ~${k(e.reviewTokens)} tokens`);
   out.push(`Total Claude tokens: ~${k(e.tokens[0])}–${k(e.tokens[1])}`);
   out.push(`Local render time: ~${Math.ceil(e.renderSeconds / 60)} min`);
+  out.push(`Speaking rate: ${formatRate(e.rate)}`);
   if (e.services.length) out.push(`External / heavy: ${e.services.join("; ")}`);
   for (const w of e.warnings) out.push(`⚠ ${w}`);
   return out.join("\n");

@@ -40,7 +40,7 @@ Marks printed by status: `✓` done · `→` current · `!` input changed after 
 - **Do:** follow the writers-room process (research → angle → beat outline → visual abstract), then write `D/script.md` as two columns:
   - `## s01 · Title` per scene, ids `s01, s02…` in order; `> visual:`, `> camera:`, `> sfx:`, `> silence: 1.5s`, `> source: <id>` lines optional.
   - Each `- ` bullet = one spoken sentence (≤ 20 words) = one TTS call = one caption cue.
-  - Hook in the first 3 s; one idea per scene; the total speaking time fits the target length (vi ≈ 2.8 words/s, en ≈ 2.5 words/s).
+  - Hook in the first 3 s; one idea per scene; the total speaking time fits the target length at the voice's speaking rate: `status.mjs D --estimate` prints it (measured from voice samples or the first `build-audio`, stored in `studio.json → audio.tts.<lang>.words_per_second`; before that the planning default vi 2.8, en 2.5 words/s). ZeroTTS voices often read about 4.5 words/s.
   - Run `script-lint.mjs D`, fix what it prints, do a read-aloud pass, cut about 20%.
 - **Ask:** show the script, total word count and estimated seconds: "Bạn duyệt kịch bản này chứ? Muốn sửa câu nào?"
 - **Close:** after the user's OK → `--approve script`.
@@ -51,7 +51,7 @@ Marks printed by status: `✓` done · `→` current · `!` input changed after 
   - one scene per script heading, same id; `lines[]` = the bullets (`id` = `<scene>-<n>`; `say` when numbers must be spelled out for TTS while `text` keeps digits);
   - visual modes come from `story.modes` (writers-room `visual-modes/`, at most 3 loaded);
   - `type` per scene: `text | diagram | data | lottie | rive | explainer | character | screen | 3d`. Prefer cheap types; use `explainer`, `character`, `screen`, `3d` only when the idea needs them;
-  - `duration` ≥ spoken time + 0.5 s; `transition` from brand defaults unless the story needs another;
+  - `duration` ≈ 0.3 s lead-in + words ÷ speaking rate + 0.25 s per pause + 1–1.5 s + the scene's scripted `> silence:`; never plan at the default rate when a measured one exists. `--estimate` warns about scenes planned more than 2.5 s longer than their speech; `transition` from brand defaults unless the story needs another;
   - world scenes: declare root `worlds` (`file`, `size`) and per scene `world`, `camera {from,to,move}`, `exit_state`; consecutive scenes of one world must chain (`camera.to` = next `camera.from`), the validator checks it and `new-scene` makes their transitions `cut`;
   - `character.style` = a lemo-opuscar style slug; `explainer.size` = `figure` unless the user asked for more.
 - **Ask:** show a table `id · type · duration · visual · lines`, the total length, and which scene types are expensive.
@@ -84,7 +84,8 @@ Marks printed by status: `✓` done · `→` current · `!` input changed after 
 - **Captions** (re-ask only if the user wants to change the gate 0 answer): "Giữ phụ đề <mode> chứ?" → `status.mjs D --captions <mode>`.
 - **SFX** (optional): add `scenes[].sfx[]` cues to the storyboard (`references/audio-tts.md`); the picker page lists the built-in kit.
 - `build-audio.mjs D --dry-run` → number of TTS calls. If `services.tts` is not true, ask once; then `build-audio.mjs D --allow-tts`.
-- It fits scene lengths to the VO and writes `data-line` reveal timings into scenes that use them (approvals kept, gates 5–6 stay ✓), writes `audio/vo.wav`, `captions.srt` (unless captions are `none`), `audio/manifest.json`. Scenes it changed re-render at gate 8 (`render-changed-scenes --preview`).
+- It fits scene lengths to the VO and writes `data-line` reveal timings into scenes that use them (approvals kept, gates 5–6 stay ✓), writes `audio/vo.wav`, `captions.srt` (unless captions are `none`), `audio/manifest.json`, and the voice's measured speaking rate. Scenes it changed re-render at gate 8 (`render-changed-scenes --preview`).
+- It only ever lengthens a scene. When it prints `⚠ … longer than their voice-over`: `build-audio.mjs D --tighten` → show the table (storyboard, VO, silence, proposed = VO + 1.2 s + silence; `--pad` to change). Ask: "Rút ngắn các scene theo bảng này chứ? Storyboard sẽ cần duyệt lại." On OK → `--tighten --apply` (writes `storyboard.json`, refits scenes from the cached VO, no TTS call), then re-approve storyboard and estimate; keyframe approvals stay.
 - **Close:** `--approve audio` (refuses while music is undecided or the audio is stale).
 
 ## 8 · Preview — approval

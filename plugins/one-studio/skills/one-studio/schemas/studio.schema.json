@@ -530,6 +530,11 @@
         "key_env": {
           "type": "string",
           "pattern": "^[A-Z][A-Z0-9_]*$"
+        },
+        "words_per_second": {
+          "type": "object",
+          "description": "Measured speaking rate per voice (key: voice, or voice@speed when speed is not 1). Written by build-audio and voice samples; used by script-lint, status --estimate and storyboard planning instead of the 2.8 / 2.5 defaults.",
+          "additionalProperties": { "type": "number", "exclusiveMinimum": 0 }
         }
       }
     },

@@ -14,14 +14,9 @@ import { join, relative } from "node:path";
 import { isMain, loadProject, parseArgs, writeJson } from "./lib/project.mjs";
 import { probe } from "./lib/ffmpeg.mjs";
 import { endpointFor, listVoices, probeEndpoint, speech, toWav } from "./lib/tts.mjs";
+import { measureRate, recordRate, ttsKey } from "./lib/speech-rate.mjs";
 
 const SAMPLE_TEXT = { vi: "Xin chào, đây là giọng đọc thử cho video của bạn.", en: "Hello, this is a sample voice for your video." };
-
-// Key of studio.audio.tts that serves `lang` (same lookup as endpointFor).
-function ttsKey(studio, lang) {
-  const tts = studio.audio?.tts ?? {};
-  return tts[lang] ? lang : tts[lang?.split("-")[0]] ? lang.split("-")[0] : "default";
-}
 
 export async function voiceSamples(dir, { ids = "all", text, lang, allowTts = false, log = () => {} } = {}) {
   const project = loadProject(dir);
@@ -46,12 +41,17 @@ export async function voiceSamples(dir, { ids = "all", text, lang, allowTts = fa
       writeFileSync(join(tmp, "raw"), bytes);
       const file = join(outDir, `${voice.replace(/[^\w.-]+/g, "_")}.wav`);
       toWav(join(tmp, "raw"), file);
-      out.push({ voice, file: relative(project.root, file), seconds: Math.round(probe(file).duration * 100) / 100 });
+      const seconds = Math.round(probe(file).duration * 100) / 100;
+      // A first rough speaking rate per voice; the first build-audio replaces it with the real sentences.
+      const wps = measureRate([{ text: say, seconds }], { minSeconds: 1 });
+      recordRate(project.studio, lang, voice, ep.speed ?? 1, wps, { keepExisting: true });
+      out.push({ voice, file: relative(project.root, file), seconds, wps });
       log(`✓ ${voice}`);
     }
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
+  project.save();
   return out;
 }
 
@@ -96,7 +96,7 @@ async function main() {
   }
   if (args.samples) {
     const r = await voiceSamples(args._[0] ?? ".", { ids: args.samples, text: args.text, lang: args.lang, allowTts: args["allow-tts"], log: console.log });
-    for (const x of r) console.log(`  ${x.voice.padEnd(16)} ${x.file} (${x.seconds}s)`);
+    for (const x of r) console.log(`  ${x.voice.padEnd(16)} ${x.file} (${x.seconds}s${x.wps ? `, ~${x.wps} words/s` : ""})`);
     console.log("Next: audio-picker.mjs <dir> → review/audio-picker.html; ask which voice, then --use-voice <id>.");
     return;
   }
