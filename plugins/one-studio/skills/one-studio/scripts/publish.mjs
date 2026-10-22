@@ -9,47 +9,18 @@
 // Remotion scenes are fitted from their main clip. Audio and captions are shared with the main video.
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import { ASPECTS, GATES, TEMPLATE_DIR, fileHash, isMain, loadProject, now, parseArgs, sceneEngine } from "./lib/project.mjs";
+import { ASPECTS, GATES, TEMPLATE_DIR, fileHash, isMain, loadProject, now, parseArgs } from "./lib/project.mjs";
 import { gateInputHash, gateProblems, outputPath } from "./lib/gates.mjs";
-import { encodeSettings, normalize, probe, run } from "./lib/ffmpeg.mjs";
-import { ENGINES } from "./lib/engines.mjs";
+import { probe, run } from "./lib/ffmpeg.mjs";
 import { escapeHtml } from "./lib/scenes.mjs";
-import { fitClip, ratioTag, variantHash, variantRoot } from "./lib/variants.mjs";
+import { ratioTag } from "./lib/variants.mjs";
+import { renderRatioClips } from "./lib/ratio-render.mjs";
 import { planRender } from "./render-changed-scenes.mjs";
 import { assemble } from "./concat-and-mix.mjs";
 import { loadResearch, sourceIds } from "./lib/research.mjs";
 import { contactSheet } from "./keyframe-stills.mjs";
 
 const hf = (project, args) => run(process.platform === "win32" ? "npx.cmd" : "npx", ["--yes", `hyperframes@${project.studio.engine.versions?.hyperframes ?? "0.8.181"}`, ...args]);
-
-function renderVariant(project, aspect, log) {
-  const tag = ratioTag(aspect);
-  const size = ASPECTS[aspect];
-  const settings = { ...encodeSettings(project.studio, "final"), ...size };
-  const root = variantRoot(project, aspect);
-  const dir = join(project.root, project.studio.render?.out_dir ?? "out", tag, "scenes");
-  mkdirSync(dir, { recursive: true });
-  const mainPlan = planRender(project, { mode: "final" });
-  const clips = [];
-  for (const item of mainPlan) {
-    const scene = item.scene;
-    const vh = variantHash(project, scene, aspect);
-    const clip = join(dir, `${scene.id}-${vh}.mp4`);
-    if (!existsSync(clip)) {
-      const raw = join(dir, `${scene.id}-${vh}.raw.mp4`);
-      const engine = sceneEngine(scene, project.studio);
-      if (engine === "hyperframes") ENGINES.hyperframes.render(project, scene, raw, { mode: "final", root });
-      else if (engine === "lemo") ENGINES.lemo.render(project, scene, raw, { size });
-      else fitClip(join(project.root, item.clip), raw, { ...size, fps: settings.fps });
-      normalize(raw, clip, settings);
-      rmSync(raw, { force: true });
-      log(`✓ ${tag} ${scene.id} rendered`);
-    } else log(`· ${tag} ${scene.id} cached`);
-    clips.push(clip);
-  }
-  rmSync(root, { recursive: true, force: true });
-  return { clips, settings, dir };
-}
 
 // "s02@3.5" (or with a full-width ＠) → { id, t }
 export function parseThumbFrame(spec, project) {
@@ -159,7 +130,7 @@ export function publish(dir, { ratios = null, thumb = true, title = null, subtit
   deliverables.push({ aspect: main, path: relative(project.root, mainFile), width: mp.video.width, height: mp.video.height, duration: mp.duration, lufs: mainInfo.lufs ?? null });
 
   for (const aspect of wanted) {
-    const { clips, settings, dir: clipDir } = renderVariant(project, aspect, log);
+    const { clips, settings, dir: clipDir } = renderRatioClips(project, aspect, { mode: "final", log });
     clipsByAspect[aspect] = clips;
     const out = join(outDir, `${name}-${ratioTag(aspect)}.mp4`);
     const r = assemble(project, clips, settings, out, { log });

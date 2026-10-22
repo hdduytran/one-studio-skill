@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { SCENE_TYPES, SKILL_DIR, sceneEngine } from "./project.mjs";
 import { captureFiles } from "./flow.mjs";
 import { formatRate, speechRate, wordCount } from "./speech-rate.mjs";
+import { platformWarnings } from "./platforms.mjs";
 
 // Seconds a scene needs for its sentences at the voice's rate, with the audio step's default lead-in, pauses, padding.
 function speechSeconds(project, scene, wps) {
@@ -100,6 +101,7 @@ export function estimate(project) {
   if (build.length > warnScenes) warnings.push(`${build.length} scenes to build (> ${warnScenes}): consider trimming or splitting`);
   const heavy = [...new Set(build.map((r) => r.type).filter((t) => (credit.warn_types ?? ["3d", "character"]).includes(t)))];
   if (heavy.length) warnings.push(`heavy scene types: ${heavy.join(", ")} (high token cost, slower render)`);
+  warnings.push(...platformWarnings(project.studio));
   if (slack.length) {
     warnings.push(`planned longer than the voice-over at ${formatRate(rate)}: ${slack.join(", ")}. Shorten in storyboard.json now (VO + 1–1.5 s + scripted silence), or after the first build with build-audio.mjs --tighten`);
   }

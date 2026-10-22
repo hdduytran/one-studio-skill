@@ -9,15 +9,16 @@ Marks printed by status: `✓` done · `→` current · `!` input changed after 
 ## 0 · Setup
 
 - **In:** the user's request.
-- **Ask (one message, only missing items):** new video or series episode · 2D/3D/mixed · aspect + length (+ other ratios to publish) · VO language · look (brand colours/fonts/logo, a preset, or defaults) · **captions** · allowed services. Vietnamese example:
+- **Ask (one message, only missing items):** new video or series episode · where it will be posted (infer it when the user names YouTube Shorts, TikTok or Reels) · 2D/3D/mixed · aspect + length (+ other ratios to publish) · VO language · look (brand colours/fonts/logo, a preset, or defaults) · **captions** · allowed services. Vietnamese example:
   > Mình cần vài thông tin trước khi bắt đầu:
   > 1. Video mới hay tập tiếp theo của series nào?
-  > 2. 2D, 3D hay kết hợp? Tỉ lệ khung (16:9, 9:16, 1:1) và độ dài? Có cần xuất thêm tỉ lệ khác không?
+  > 2. Đăng ở đâu (YouTube, YouTube Shorts, TikTok, Reels…)? 2D, 3D hay kết hợp? Tỉ lệ khung (16:9, 9:16, 1:1) và độ dài? Có cần xuất thêm tỉ lệ khác không?
   > 3. Giọng đọc tiếng Việt qua ZeroTTS ở `http://localhost:8000` đúng không?
   > 4. Màu/phông/logo riêng, hay chọn một mẫu: `apple-light`, `apple-keynote`, `neon-terminal`, `synthwave`, `ocean-calm`, `warm-editorial`, `swiss-mono`, `infinity-board`, `default`, các mẫu đã lưu từ video trước (xem `init-project.mjs --help`), hoặc lấy style từ một video/link có sẵn? (mình có thể dựng bảng so sánh)
   > 5. Phụ đề: **không** · **chỉ file .srt** · **phụ đề mềm** (bật/tắt được, kèm .srt) · **in cứng vào hình**?
   > 6. Được dùng dịch vụ trả phí / từ xa nào không? (mặc định: không)
-- **Do:** `node "$S/scripts/init-project.mjs" D --title "…" --lang <code> --dimension <2d|3d|mixed> --aspect <ratio> --duration <s> [--exports 16:9,9:16] [--preset <name>] [--captions none|sidecar|mux|burn] [--tts-url <url>] [--probe-tts] [--series <name>] [--series-root <dir>]`.
+- **Do:** `node "$S/scripts/init-project.mjs" D --title "…" --lang <code> --dimension <2d|3d|mixed> --aspect <ratio> --duration <s> [--exports 16:9,9:16] [--platform shorts,tiktok,reels,youtube] [--preset <name>] [--captions none|sidecar|mux|burn] [--tts-url <url>] [--probe-tts] [--series <name>] [--series-root <dir>]`.
+  - Shorts, TikTok and Reels are 9:16 (Shorts and Reels up to 3 min, TikTok 10 min): say so and suggest `--exports 9:16` (or `--aspect 9:16` when vertical is the main cut). `--platform` adds the missing 9:16 export itself, keeps 9:16 burned captions out of the platform UI (bottom 20 %, right 12 %) and warns when the target length is over the limit.
   - With `--series`, brand lives at `<series-root>/<name>/brand/brand.json` (default series root `D/../series`). If it exists it is reused: **do not ask brand questions**; the captions answer then goes to `studio.json → captions`.
   - "Lấy style từ video/link" → load `../style-extract/SKILL.md` and follow its steps (fetch needs `services.download`, asked once); its compare step shows 3 sample scenes in the style (works with no scenes yet); its apply step writes `brand.json` and `studio.json → story.style`, and only after the user's explicit OK on that sheet (ask again when approved scenes would need re-approval).
   - Presets saved from a style (`style-apply --as-preset`) live in the plugin cache and appear in `compare-presets.mjs`, `init-project --preset` and the list above like the built-in ones.
@@ -91,6 +92,7 @@ Marks printed by status: `✓` done · `→` current · `!` input changed after 
 ## 8 · Preview — approval
 
 - `render-changed-scenes.mjs D --preview` then `concat-and-mix.mjs D --preview` → `out/<name>-preview.mp4` (540p, VO, music, captions, −14 LUFS).
+- Export ratios (always when `format.platforms` has shorts/tiktok/reels): `concat-and-mix.mjs D --preview --ratio 9:16` → `out/<name>-preview-9x16.mp4` (540×960, same audio and captions). Review only; fixes go into `<style data-ratio="9:16">` blocks.
 - **Ask:** send the path; collect scene-level fixes. Fixes → back to gate 5 for those scenes only.
 - **Close:** after OK → `--approve preview`.
 

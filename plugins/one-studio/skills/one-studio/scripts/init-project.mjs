@@ -16,11 +16,13 @@ import { CAPTION_MODES } from "./lib/captions.mjs";
 import { RATIO_STAGE_VERSION } from "./lib/hash.mjs";
 import { hasDrawtext, hasLibass } from "./lib/ffmpeg.mjs";
 import { PRESET_NAMES, applyPreset } from "./lib/presets.mjs";
+import { PLATFORMS, missingRatios, parsePlatforms, platformWarnings } from "./lib/platforms.mjs";
 import { listVoices } from "./lib/tts.mjs";
 
 const USAGE = `usage: init-project.mjs <dir> [--title "…"] [--lang vi] [--dimension 2d|3d|mixed]
        [--aspect 16:9|9:16|1:1|4:5] [--fps 30] [--duration 45] [--series <name>] [--series-root <dir>]
        [--preset ${PRESET_NAMES().join("|")}] [--captions ${CAPTION_MODES.join("|")}] [--exports 16:9,9:16]
+       [--platform ${Object.keys(PLATFORMS).join(",")}]  (shorts/tiktok/reels add a 9:16 export)
        [--tts-url <base_url>] [--voice <id>] [--probe-tts]`;
 
 const fill = (text, vars) => text.replace(/\{\{(\w+)\}\}/g, (m, k) => (k in vars ? String(vars[k]) : m));
@@ -104,7 +106,7 @@ function seriesBumpers(root, brand, { title, language, format, episode }) {
 async function main() {
   const args = parseArgs(process.argv.slice(2), {
     flags: ["help", "probe-tts"],
-    options: ["title", "lang", "dimension", "aspect", "fps", "duration", "series", "series-root", "preset", "captions", "exports", "tts-url", "voice"],
+    options: ["title", "lang", "dimension", "aspect", "fps", "duration", "series", "series-root", "preset", "captions", "exports", "tts-url", "voice", "platform"],
   });
   const dir = args._[0];
   if (args.help || !dir) {
@@ -125,6 +127,7 @@ async function main() {
   if (args.captions && !CAPTION_MODES.includes(args.captions)) throw new Error(`--captions must be one of ${CAPTION_MODES.join(", ")}`);
   const exportsArg = args.exports ? args.exports.split(",").map((r) => r.trim()) : null;
   for (const r of exportsArg ?? []) if (!ASPECTS[r]) throw new Error(`--exports: unknown aspect ${r}`);
+  const platforms = args.platform ? parsePlatforms(args.platform) : null;
 
   const name = slug(basename(root));
   for (const sub of ["assets", "scenes", "audio", "review", "out/scenes"]) mkdirSync(join(root, sub), { recursive: true });
@@ -146,6 +149,11 @@ async function main() {
 
   const exportsList = exportsArg ? [aspect, ...exportsArg.filter((r) => r !== aspect)] : prev?.format?.aspect === aspect ? prev.format.exports ?? [aspect] : [aspect];
   const format = { aspect, ...ASPECTS[aspect], fps, target_duration: duration, exports: exportsList };
+  const platformList = platforms ?? prev?.format?.platforms ?? null;
+  if (platformList?.length) format.platforms = platformList;
+  // Shorts / TikTok / Reels are 9:16: add the export the platform needs (gate 0 told the user so).
+  const added = missingRatios(format);
+  format.exports.push(...added);
   const bumpers = seriesBumpers(root, brand, { title, language, format, episode: brand.episode });
   writeJson(join(root, "storyboard.json"), { version: 1, scenes: bumpers });
 
@@ -197,7 +205,8 @@ async function main() {
       sentence_pause: prev?.audio?.sentence_pause ?? 0.25,
       scene_padding: prev?.audio?.scene_padding ?? 0.5,
     },
-    render: prev?.render ?? { quality: "looks", preview_height: 540, out_dir: "out", codec: "h264", pix_fmt: "yuv420p", ratio_stage: RATIO_STAGE_VERSION },
+    // A new project has no stills or clips made before ratio blocks were staged (lib/hash.mjs).
+    render: { ...(prev?.render ?? { quality: "looks", preview_height: 540, out_dir: "out", codec: "h264", pix_fmt: "yuv420p" }), ratio_stage: RATIO_STAGE_VERSION },
     credit: prev?.credit ?? { warn_scenes: 8, warn_types: ["3d", "character", "explainer"] },
   };
   writeJson(join(root, "studio.json"), studio);
@@ -217,6 +226,11 @@ async function main() {
   console.log(`  look      ${finalBrand.preset ?? "default"}${finalBrand.surface === "glass" ? " · glass surface" : ""}  (compare: compare-presets.mjs <dir>)`);
   console.log(`  captions  ${studioCaptions?.enabled === false || (!studioCaptions && finalBrand.captions?.enabled === false) ? "none" : studioCaptions?.mode ?? finalBrand.captions?.mode ?? "burn"}${libass ? "" : " (no libass here: burn → mux)"}${hasDrawtext() ? "" : " · no drawtext: contact sheets unlabelled"}`);
   if (format.exports.length > 1) console.log(`  exports   ${format.exports.join(", ")} (keyframe-stills shows every ratio at gate 5)`);
+  if (format.platforms) {
+    console.log(`  platform  ${format.platforms.map((p) => PLATFORMS[p].label).join(", ")}${added.length ? ` → added export ${added.join(", ")}` : ""}`);
+    if (format.platforms.some((p) => PLATFORMS[p].vertical)) console.log("            9:16 captions stay out of the bottom 20% / right 12% UI; check it at gate 8: concat-and-mix.mjs <dir> --preview --ratio 9:16");
+    for (const w of platformWarnings({ format })) notes.push(w);
+  }
   for (const n of notes) console.log(`  ⚠ ${n}`);
   if (brand.series) {
     console.log(`  series    ${brand.series}, episode ${brand.episode}`);

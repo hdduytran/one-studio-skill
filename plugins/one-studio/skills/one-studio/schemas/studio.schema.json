@@ -121,6 +121,12 @@
           ],
           "minimum": 1
         },
+        "platforms": {
+          "type": "array",
+          "description": "Where the video will be posted (gate 0). shorts / tiktok / reels need a 9:16 export and keep 9:16 burned captions out of the platform UI.",
+          "items": { "enum": ["youtube", "shorts", "tiktok", "reels", "facebook", "linkedin"] },
+          "uniqueItems": true
+        },
         "exports": {
           "type": "array",
           "items": {

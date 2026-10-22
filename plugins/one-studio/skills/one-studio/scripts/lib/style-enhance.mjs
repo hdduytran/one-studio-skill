@@ -12,8 +12,9 @@ import { supportsVietnamese, vietnameseSibling } from "./style-fonts.mjs";
 import { SERIES_OWNED, clone, deletePath, effectiveStyle, getPath, isLocked, layerUnits, lockedOf, provenanceKeys, readLayer, setPath, unitOf } from "./style-layers.mjs";
 import { mergeBrandPatch, styleDir } from "./style-refs.mjs";
 
-// Safe areas of TikTok / Reels chrome as fractions of the frame, and the average sentence length used for pacing.
-export const UI_ZONE = { bottom: 0.2, right: 0.12 };
+// Safe areas of TikTok / Reels chrome (lib/platforms.mjs), and the average sentence length used for pacing.
+import { UI_ZONE } from "./platforms.mjs";
+export { UI_ZONE };
 export const WORDS_PER_SENTENCE = 12;
 export const SERIES_COLOR_MIN_DELTA_E = 8;
 const CAPTION_CHAR_WIDTH = 0.55; // average glyph width in em

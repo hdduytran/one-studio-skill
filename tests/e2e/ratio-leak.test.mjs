@@ -41,4 +41,8 @@ test("9:16 ratio block stays out of 16:9 stills and clips, even after a plain <s
   ok("render-changed-scenes.mjs", dir, "--preview");
   const clip = join(dir, "out", "preview", readdirSync(join(dir, "out", "preview")).find((f) => f.endsWith(".mp4")));
   assert.ok(!isRed(pixel(clip, 1)), "16:9 preview clip has no 9:16 rule");
+  // Gate 8 check of the Shorts cut: a low-res 9:16 preview with its own rule.
+  ok("concat-and-mix.mjs", dir, "--preview", "--ratio", "9:16");
+  const tall = join(dir, "out", readdirSync(join(dir, "out")).find((f) => f.endsWith("-preview-9x16.mp4")));
+  assert.ok(isRed(pixel(tall, 1)), "9:16 preview has its rule");
 });
