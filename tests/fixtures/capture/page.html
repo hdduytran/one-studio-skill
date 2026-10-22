@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Capture fixture</title>
+<style>
+  body { margin: 0; font: 20px sans-serif; background: #f4f4f8; }
+  .row { display: flex; gap: 40px; padding: 120px 0 0 140px; }
+  button { width: 180px; height: 64px; font-size: 22px; border: 0; border-radius: 10px; background: #3b6cf6; color: #fff; }
+  button.on { background: #10a36b; }
+  #out { padding: 40px 140px; }
+  input { margin: 20px 140px 0; width: 360px; height: 40px; font-size: 20px; display: block; }
+</style>
+</head>
+<body>
+<div class="row">
+  <button id="b1">One</button>
+  <button id="b2" style="margin-top: 160px">Two</button>
+  <button id="b3" style="margin-left: 300px">Three</button>
+</div>
+<div id="out">idle</div>
+<input id="name" placeholder="name" />
+<input id="pw" type="password" placeholder="password" />
+<div style="height: 1400px"></div>
+<script>
+  for (const b of document.querySelectorAll("button")) b.onclick = () => { b.classList.add("on"); document.getElementById("out").textContent = b.id + " clicked"; };
+</script>
+</body>
+</html>

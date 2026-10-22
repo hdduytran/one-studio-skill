@@ -1,13 +1,20 @@
 // Shared helpers for one-studio scripts: paths, JSON IO, hashing, gates, scene routing.
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { validate } from "./schema.mjs";
+import { sameWorldPairs, visualRefErrors } from "./visual-refs.mjs";
 
 export const SKILL_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 export const SCHEMA_DIR = join(SKILL_DIR, "schemas");
 export const TEMPLATE_DIR = join(SKILL_DIR, "templates");
+
+// Folders scenes reference by relative path (../worlds/…): linked into every staging folder.
+export const SHARED_DIRS = ["worlds", "capture", "flows"];
+export function linkSharedDirs(fromRoot, toRoot) {
+  for (const dir of SHARED_DIRS) if (existsSync(join(fromRoot, dir))) symlinkSync(join(fromRoot, dir), join(toRoot, dir), "dir");
+}
 
 export const ENGINE_VERSIONS = { hyperframes: "0.8.181" };
 
@@ -42,6 +49,7 @@ export const SCENE_TYPES = {
   rive: { engine: "hyperframes", level: "medium", refs: ["references/scene-types/_common.md", "references/scene-types/lottie-rive.md"], deps: ["@rive-app/canvas"] },
   explainer: { engine: "hyperframes", level: "high", refs: ["references/scene-types/_common.md", "references/scene-types/explainer-anatomy.md"], deps: ["anatomy skill (wheresryan22/anatomy)"] },
   character: { engine: "lemo", level: "high", refs: ["references/scene-types/character-lemo.md"], deps: ["lemo-opuscar library (~350 MB deps)"] },
+  screen: { engine: "hyperframes", level: "medium", refs: ["references/scene-types/_common.md", "references/scene-types/screen.md"], deps: ["Chrome + FFmpeg for capture-screen (needs services.capture)"] },
   "3d": { engine: "hyperframes", level: "high", refs: ["references/scene-types/_common.md", "references/scene-types/3d.md"], deps: ["three (vendored)"] },
 };
 
@@ -98,6 +106,20 @@ export function loadProject(dir) {
 // Placeholders left by templates. A gate input that still has one is not ready.
 export const TODO_RE = /<!--\s*TODO|\bTODO:/;
 
+// Scenes written before their neighbour joined the same world may still fade into it.
+function worldTransitionErrors(project) {
+  const errors = [];
+  const attr = (html, name) => new RegExp(`data-composition-id=[^>]*?${name}="([^"]*)"`, "s").exec(html)?.[1];
+  for (const [a, b] of sameWorldPairs(project.storyboard)) {
+    for (const [scene, name] of [[a, "data-transition-out"], [b, "data-transition-in"]]) {
+      const file = join(project.root, "scenes", `${scene.id}.html`);
+      const kind = existsSync(file) ? attr(readFileSync(file, "utf8"), name) : "cut";
+      if (kind && kind !== "cut") errors.push(`scene ${scene.id}: ${name}="${kind}" between ${a.id} and ${b.id} (same world "${a.world}") must be "cut"`);
+    }
+  }
+  return errors;
+}
+
 // Cross-file checks the schemas cannot express.
 export function crossCheck(project) {
   const errors = [];
@@ -109,8 +131,12 @@ export function crossCheck(project) {
     const lineIds = sb.scenes.flatMap((s) => (s.lines ?? []).map((l) => l.id));
     const dupLines = lineIds.filter((id, i) => lineIds.indexOf(id) !== i);
     if (dupLines.length) errors.push(`storyboard: duplicate line ids ${[...new Set(dupLines)].join(", ")}`);
+    errors.push(...visualRefErrors(sb));
+    errors.push(...worldTransitionErrors(project));
     for (const s of sb.scenes) {
       if (s.type === "character" && !s.character?.style) errors.push(`storyboard ${s.id}: character scene needs character.style`);
+      if (s.type === "screen" && !s.screen?.flow) errors.push(`storyboard ${s.id}: screen scene needs screen.flow`);
+      if (s.type === "screen" && s.screen?.flow && !existsSync(join(project.root, "flows", `${s.screen.flow}.json`))) errors.push(`storyboard ${s.id}: missing flow flows/${s.screen.flow}.json`);
       if (s.engine === "lemo" && s.type !== "character") errors.push(`storyboard ${s.id}: engine lemo is only for character scenes`);
       for (const a of s.assets ?? []) {
         if (!existsSync(join(project.root, a))) errors.push(`storyboard ${s.id}: missing asset ${a}`);

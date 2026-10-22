@@ -1,0 +1,19 @@
+<!-- Starter world: one canvas, 4000 x 2400 world units (1 unit = 1px; scenes size it from storyboard worlds.<name>.size).
+     Camera targets are the data-place elements; data-state elements switch look with S.state(id, name, { at }).
+     Brand variables only. No CSS transitions or animations: motion is the camera's and the timeline's. -->
+<style>
+  .w-ground { position: absolute; inset: 0; background: var(--c-bg); }
+  .w-place { position: absolute; border: 8px solid var(--c-primary); border-radius: 48px; color: var(--c-fg);
+    font-family: var(--font-heading); font-weight: var(--fw-heading); font-size: calc(var(--fs-h1) * 1px);
+    display: flex; align-items: flex-end; padding: 40px; }
+  .w-link { position: absolute; height: 12px; background: var(--c-muted); }
+  .w-beacon { position: absolute; width: 160px; height: 160px; border-radius: 50%; background: var(--c-muted); }
+  .w-beacon[data-state="signal"] { background: var(--c-accent); box-shadow: 0 0 0 40px var(--c-secondary); }
+</style>
+<div class="w-ground"></div>
+<div class="w-link" style="left: 1200px; top: 1194px; width: 700px"></div>
+<div class="w-link" style="left: 2800px; top: 1194px; width: 400px"></div>
+<div class="w-place" data-place="start" style="left: 400px; top: 800px; width: 800px; height: 800px">Start</div>
+<div class="w-place" data-place="middle" style="left: 1900px; top: 900px; width: 900px; height: 600px">Middle</div>
+<div class="w-place" data-place="end" style="left: 3200px; top: 700px; width: 600px; height: 1000px">End</div>
+<div class="w-beacon" id="beacon" data-state="idle" style="left: 2170px; top: 1000px"></div>

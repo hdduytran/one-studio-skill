@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildSrt, srtTime, wrapCue } from "../plugins/one-studio/skills/one-studio/scripts/lib/captions.mjs";
 import { assColor, captionStyle } from "../plugins/one-studio/skills/one-studio/scripts/concat-and-mix.mjs";
@@ -8,7 +8,7 @@ import { resizeHtml } from "../plugins/one-studio/skills/one-studio/scripts/lib/
 import { toTemplate } from "../plugins/one-studio/skills/one-studio/scripts/series-bumper.mjs";
 import { anatomyToSvg, scopeCss } from "../plugins/one-studio/skills/one-studio/scripts/anatomy-to-svg.mjs";
 import { collectRefs, sceneHash, audioHash } from "../plugins/one-studio/skills/one-studio/scripts/lib/hash.mjs";
-import { loadProject, sceneEngine } from "../plugins/one-studio/skills/one-studio/scripts/lib/project.mjs";
+import { linkSharedDirs, loadProject, sceneEngine } from "../plugins/one-studio/skills/one-studio/scripts/lib/project.mjs";
 import { readJson, run, scene, tmp, writeJson } from "./helpers.mjs";
 
 test("captions: srt time format, balanced wrapping, proportional split", () => {
@@ -168,4 +168,16 @@ test("series: new episode inherits format, voice, consent and gets bumpers", () 
     '<div data-composition-id="intro" data-duration="2" data-width="1080">Tập 2</div>',
   );
   assert.equal(run("validate.mjs", ep2).code, 0);
+});
+
+test("staging folders link worlds/, capture/ and flows/ when the project has them", () => {
+  const from = join(tmp(), "project");
+  const to = join(tmp(), "stage");
+  mkdirSync(join(from, "worlds"), { recursive: true });
+  mkdirSync(join(from, "flows"), { recursive: true });
+  mkdirSync(to, { recursive: true });
+  linkSharedDirs(from, to);
+  assert.ok(lstatSync(join(to, "worlds")).isSymbolicLink());
+  assert.ok(lstatSync(join(to, "flows")).isSymbolicLink());
+  assert.ok(!existsSync(join(to, "capture")), "absent folders are not linked");
 });

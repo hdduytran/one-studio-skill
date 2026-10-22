@@ -17,6 +17,7 @@ import { escapeHtml } from "./lib/scenes.mjs";
 import { fitClip, ratioTag, variantHash, variantRoot } from "./lib/variants.mjs";
 import { planRender } from "./render-changed-scenes.mjs";
 import { assemble } from "./concat-and-mix.mjs";
+import { loadResearch, sourceIds } from "./lib/research.mjs";
 import { contactSheet } from "./keyframe-stills.mjs";
 
 const hf = (project, args) => run(process.platform === "win32" ? "npx.cmd" : "npx", ["--yes", `hyperframes@${project.studio.engine.versions?.hyperframes ?? "0.8.181"}`, ...args]);
@@ -112,6 +113,16 @@ function sheetFromClips(clips, ids, out) {
   return out;
 }
 
+// Research rows cited by storyboard lines, in first-use order → [{ id, name, url, published, accessed }].
+export function citedSources(project) {
+  const rows = new Map(loadResearch(project).map((r) => [r.id, r]));
+  const ids = [...new Set((project.storyboard?.scenes ?? []).flatMap((s) => (s.lines ?? []).flatMap((l) => sourceIds(l.source))))];
+  return ids.filter((id) => rows.has(id)).map((id) => {
+    const r = rows.get(id);
+    return { id, name: r.source, url: r.url, published: r.published, accessed: r.accessed };
+  });
+}
+
 export function publish(dir, { ratios = null, thumb = true, title = null, subtitle = null, thumbFrame = null, log = () => {} } = {}) {
   const project = loadProject(dir);
   const renderGate = GATES.find((g) => g.id === "render");
@@ -183,6 +194,12 @@ export function publish(dir, { ratios = null, thumb = true, title = null, subtit
     audio: mainInfo.audio ?? null,
   };
   const manifestPath = outputPath(project, "manifest");
+  const sources = citedSources(project);
+  if (sources.length) {
+    manifest.sources = sources;
+    const label = project.studio.meta.language === "vi" ? "Nguồn" : "Sources";
+    writeFileSync(join(outDir, "sources.txt"), `${label}:\n${sources.map((x) => `- ${[x.name, x.url, x.published && `(${x.published})`].filter(Boolean).join(" ")}`).join("\n")}\n`);
+  }
   writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
   project.studio.outputs ??= {};
   project.studio.outputs.publish = { path: relative(project.root, manifestPath), hash: gateInputHash(project, { id: "publish" }), at: now() };

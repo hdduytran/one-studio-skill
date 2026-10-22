@@ -74,10 +74,134 @@
     return el.querySelectorAll(".os-word");
   }
 
+  // Stepped motion: sample scene time on a fixed grid (hand-made, Vox-like judder) while the render keeps full fps.
+  // The epsilon keeps exact grid times (e.g. 0.25 at 12 fps) from falling into the previous step.
+  var STEP_FPS = 12;
+  function stepTime(t, fps) {
+    fps = fps || STEP_FPS;
+    return Math.floor(t * fps + 1e-6) / fps;
+  }
+  // Route every seek of the timeline through stepTime; the root's data-motion="stepped-12" turns it on.
+  function quantiseTimeline(tl) {
+    var seek = tl.seek, time = tl.time, total = tl.totalTime;
+    tl.seek = function (t, suppress) { return seek.call(tl, stepTime(t), suppress); };
+    tl.time = function (t, suppress) { return arguments.length ? time.call(tl, stepTime(t), suppress) : time.call(tl); };
+    tl.totalTime = function (t, suppress) { return arguments.length ? total.call(tl, stepTime(t), suppress) : total.call(tl); };
+  }
+
   function fmt(n, o) {
     var s = n.toFixed(o.decimals || 0);
     if (o.thousands !== false) s = s.replace(/\B(?=(\d{3})+(?!\d))/g, o.separator || ".");
     return (o.prefix || "") + s + (o.suffix || "");
+  }
+
+  function needWorld(world, what) {
+    if (!world) throw new Error("S." + what + ": this scene has no world (set world in storyboard.json and run new-scene)");
+    return world;
+  }
+
+  // Resolve ../ style references of a world file against the file's own URL (the scene may be mounted elsewhere).
+  function rebase(html, base) {
+    var abs = function (ref) { return /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(ref) ? ref : new URL(ref, base).href; };
+    return html
+      .replace(/\b(src|href)\s*=\s*(["'])([^"']+)\2/g, function (m, a, q, ref) { return a + "=" + q + abs(ref) + q; })
+      .replace(/url\(\s*(["']?)([^"')]+)\1\s*\)/g, function (m, q, ref) { return "url(" + q + abs(ref) + q + ")"; });
+  }
+
+  function jsonAttr(el, name) {
+    var v = el.getAttribute(name);
+    return v ? JSON.parse(v) : null;
+  }
+
+  // The world layer of a scene: markup from worlds/<name>.html (read synchronously so the first frame has it),
+  // one camera/state driver on the scene timeline, and the storyboard's camera / enter_state / exit_state as defaults.
+  function worldRuntime(root, tl, dur, w, h, M) {
+    var CAM = window.OS_CAMERA;
+    if (!CAM) throw new Error("OS world: assets/camera.js is not loaded (run prepare-project, then new-scene --force)");
+    var layer = root.querySelector(".os-world");
+    var link = root.querySelector('link[rel="x-world"]');
+    if (!link) throw new Error('OS world: missing <link rel="x-world" href="../worlds/<name>.html">');
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", link.href, false);
+    xhr.send(null);
+    if (xhr.status !== 200 && xhr.status !== 0) throw new Error("OS world: cannot load " + link.href + " (" + xhr.status + ")");
+    layer.innerHTML = rebase(xhr.responseText, link.href);
+    var ctx = { frame: { w: w, h: h }, world: { w: +layer.getAttribute("data-world-w"), h: +layer.getAttribute("data-world-h") }, places: null };
+    var segs = [];
+    var changes = []; // { el, name, at }
+    var initial = new Map();
+    var driver = null;
+    var wanted = jsonAttr(layer, "data-camera");
+    var enter = jsonAttr(layer, "data-enter-state") || {};
+    var exit = jsonAttr(layer, "data-exit-state") || {};
+
+    function places() {
+      if (ctx.places) return ctx.places;
+      ctx.places = {};
+      Array.prototype.slice.call(layer.querySelectorAll("[data-place]")).forEach(function (el) {
+        var x = 0, y = 0, n = el;
+        while (n && n !== layer) { x += n.offsetLeft; y += n.offsetTop; n = n.offsetParent; }
+        ctx.places[el.getAttribute("data-place")] = { x: x, y: y, w: el.offsetWidth, h: el.offsetHeight };
+      });
+      return ctx.places;
+    }
+    function byId(id) {
+      var el = layer.querySelector("#" + id + ',[data-id="' + id + '"]');
+      if (!el) throw new Error("S.state: no world element #" + id);
+      return el;
+    }
+    function remember(el) { if (!initial.has(el)) initial.set(el, el.getAttribute("data-state")); }
+
+    function render(t) {
+      initial.forEach(function (name, el) {
+        var cur = name;
+        changes.forEach(function (c) { if (c.el === el && c.at <= t + 1e-9) cur = c.name; });
+        if (cur == null) el.removeAttribute("data-state"); else el.setAttribute("data-state", cur);
+      });
+      if (!segs.length) return;
+      var seg = segs[0];
+      segs.forEach(function (s) { if (s.at <= t + 1e-9) seg = s; });
+      var p = seg.len > 0 ? Math.min(1, Math.max(0, (t - seg.at) / seg.len)) : 1;
+      layer.style.transform = CAM.transform(CAM.sample(seg.a, seg.b, p >= 1 ? 1 : seg.ease(p), seg.move, ctx), ctx);
+    }
+    function ensureDriver() {
+      if (driver) return;
+      var clock = { t: 0 };
+      driver = tl.to(clock, { t: dur, duration: dur, ease: "none", onUpdate: function () { render(clock.t); } }, 0);
+    }
+
+    var api = {
+      camera: function (from, to, o) {
+        var move = o.move || "push";
+        var at = o.at || 0;
+        var len = move === "cut" ? 0 : o.dur || Math.max(0.001, dur - at);
+        places();
+        segs.push({ a: CAM.viewOf(from, ctx), b: CAM.viewOf(to, ctx), move: move, at: at, len: len, ease: gsap.parseEase(o.ease || (move === "follow" ? "none" : M.ease.inOut)) });
+        segs.sort(function (x, y) { return x.at - y.at; });
+        ensureDriver();
+        render(0);
+      },
+      state: function (elId, name, at) {
+        var el = byId(elId);
+        remember(el);
+        changes.push({ el: el, name: name, at: at });
+        ensureDriver();
+        render(0);
+      },
+      // Defaults from the storyboard, for what the scene's own code did not set.
+      finish: function () {
+        Object.keys(enter).forEach(function (id) { var el = byId(id); remember(el); initial.set(el, enter[id]); });
+        Object.keys(exit).forEach(function (id) {
+          var el = byId(id);
+          remember(el);
+          if (!changes.some(function (c) { return c.el === el; })) changes.push({ el: el, name: exit[id], at: Math.max(0, dur - 0.5) });
+        });
+        if (!segs.length && wanted && wanted.to != null) api.camera(wanted.from != null ? wanted.from : wanted.to, wanted.to, wanted);
+        if (segs.length || changes.length) ensureDriver();
+        render(0);
+      },
+    };
+    return api;
   }
 
   function scene(id) {
@@ -96,6 +220,8 @@
       if (typeof sel !== "string") return sel && sel.length !== undefined ? Array.prototype.slice.call(sel) : [sel];
       return Array.prototype.slice.call(root.querySelectorAll(sel));
     }
+
+    var world = root.querySelector(".os-world") ? worldRuntime(root, tl, dur, w, h, M) : null;
 
     var api = {
       id: id, root: root, tl: tl, dur: dur, motion: M, q: q,
@@ -198,6 +324,13 @@
         return api;
       },
 
+      // World camera: move the view from one place (or { x, y, zoom }) to another. See worlds/ and writers-room/visual-modes/world-camera.md.
+      //   move: cut | push | fly | orbit | follow (default push); at, dur default to the rest of the scene; ease is a GSAP ease name.
+      camera: function (from, to, o) { needWorld(world, "camera").camera(from, to, o || {}); return api; },
+
+      // Switch a world element's data-state at scene time `at`.
+      state: function (elId, name, o) { needWorld(world, "state").state(elId, name, (o && o.at) || 0); return api; },
+
       // Transition in/out from data-transition-in / data-transition-out or the brand default.
       done: function () {
         var kin = root.getAttribute("data-transition-in") || T.default;
@@ -216,11 +349,29 @@
           if (kin === "wipe") tl.fromTo(veil, { clipPath: "inset(0 0 0 0%)" }, { clipPath: "inset(0 0 0 100%)", duration: td, ease: M.ease.inOut }, 0);
         }
         if (kout !== "cut") tl.fromTo(veil, { autoAlpha: 0 }, { autoAlpha: 1, duration: td, ease: "none", immediateRender: false }, Math.max(0, dur - td));
+        if (world) world.finish();
+        labels();
         tl.seek(0);
+        if (root.getAttribute("data-motion") === "stepped-12") quantiseTimeline(tl);
         previewAudio(api);
         return api;
       },
     };
+    // Chip while an opinion / quote line is spoken: os-lines entries with a label (written by build-audio / sync-lines).
+    function labels() {
+      var times = lineTimes();
+      Object.keys(times).forEach(function (id) {
+        var t = times[id];
+        if (!t.label) return;
+        var chip = document.createElement("div");
+        chip.className = "os-label os-label-" + (t.kind === "quote" ? "quote" : "opinion");
+        chip.textContent = t.label;
+        root.appendChild(chip);
+        gsap.set(chip, { autoAlpha: 0 });
+        tl.to(chip, { autoAlpha: 1, duration: M.duration.fast, ease: M.ease.out }, t.start);
+        tl.to(chip, { autoAlpha: 0, duration: M.duration.fast, ease: M.ease.in }, Math.max(t.start, t.end - M.duration.fast));
+      });
+    }
     var cachedLines = null;
     function lineTimes() {
       if (cachedLines) return cachedLines;
@@ -256,5 +407,5 @@
     return el.querySelectorAll(".os-bar");
   }
 
-  window.OS = { scene: scene, barChart: barChart, splitWords: splitWords, version: 2 };
+  window.OS = { scene: scene, barChart: barChart, splitWords: splitWords, stepTime: stepTime, version: 2 };
 })();

@@ -1,0 +1,185 @@
+{
+  "version": 1,
+  "meta": {
+    "name": "gps-world",
+    "title": "GPS hoạt động thế nào",
+    "language": "vi",
+    "series": null,
+    "episode": null,
+    "created": "2026-10-21T17:55:12.107Z"
+  },
+  "brand": {
+    "ref": "brand/brand.json",
+    "version": null
+  },
+  "format": {
+    "aspect": "16:9",
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "target_duration": 60,
+    "exports": [
+      "16:9"
+    ]
+  },
+  "engine": {
+    "default": "hyperframes",
+    "dimension": "2d",
+    "versions": {
+      "hyperframes": "0.8.181"
+    }
+  },
+  "services": {
+    "tts": false,
+    "lemo": false,
+    "anatomy": false,
+    "remotion": false
+  },
+  "gates": {
+    "setup": {
+      "done": true,
+      "at": "2026-10-21T17:55:12.108Z"
+    },
+    "brief": {
+      "done": true,
+      "at": "2026-10-21T17:59:09.214Z",
+      "hash": "7d789943eb5c3bbe01cdcbac724e147cc277575d196171de7b13b09fca6bc2ea"
+    },
+    "script": {
+      "done": true,
+      "at": "2026-10-21T18:10:20.127Z",
+      "hash": "81308a048441e61dca883f5fb9aa6af779e377a04e178b5685dec98e9f26146b"
+    },
+    "storyboard": {
+      "done": true,
+      "at": "2026-10-21T18:10:20.158Z",
+      "hash": "27715e97d8dda98badb28807ee7f3baa55d4255a246ca023a749e5494f743512"
+    },
+    "estimate": {
+      "done": true,
+      "at": "2026-10-21T18:10:20.190Z",
+      "hash": "27715e97d8dda98badb28807ee7f3baa55d4255a246ca023a749e5494f743512"
+    },
+    "keyframes": {
+      "done": true,
+      "at": "2026-10-21T18:10:27.644Z",
+      "hash": "df9d8adeed9d"
+    },
+    "build": {
+      "done": true,
+      "at": "2026-10-21T18:11:13.783Z",
+      "hash": "df9d8adeed9d"
+    }
+  },
+  "scenes": [
+    {
+      "id": "s01",
+      "hash": "43fd2518b4c9",
+      "approved_hash": "43fd2518b4c9",
+      "clip": null,
+      "duration": null,
+      "status": "reviewed",
+      "preview_clip": "out/preview/s01-43fd2518b4c9.mp4"
+    },
+    {
+      "id": "s02",
+      "hash": "ffd72c86f16c",
+      "approved_hash": "ffd72c86f16c",
+      "clip": null,
+      "duration": null,
+      "status": "reviewed",
+      "preview_clip": "out/preview/s02-ffd72c86f16c.mp4"
+    },
+    {
+      "id": "s03",
+      "hash": "4c830f4d8d5f",
+      "approved_hash": "4c830f4d8d5f",
+      "clip": null,
+      "duration": null,
+      "status": "reviewed",
+      "preview_clip": "out/preview/s03-4c830f4d8d5f.mp4"
+    },
+    {
+      "id": "s04",
+      "hash": "574448bb9201",
+      "approved_hash": "574448bb9201",
+      "clip": null,
+      "duration": null,
+      "status": "reviewed",
+      "preview_clip": "out/preview/s04-574448bb9201.mp4"
+    },
+    {
+      "id": "s05",
+      "hash": "ac137d284de5",
+      "approved_hash": "ac137d284de5",
+      "clip": null,
+      "duration": null,
+      "status": "reviewed",
+      "preview_clip": "out/preview/s05-ac137d284de5.mp4"
+    },
+    {
+      "id": "s06",
+      "hash": "89598e60f687",
+      "approved_hash": "89598e60f687",
+      "clip": null,
+      "duration": null,
+      "status": "reviewed",
+      "preview_clip": "out/preview/s06-89598e60f687.mp4"
+    }
+  ],
+  "audio": {
+    "tts": {
+      "vi": {
+        "base_url": "http://localhost:8000",
+        "model": "zerotts",
+        "voice": "default",
+        "format": "wav",
+        "key_env": "ONE_STUDIO_TTS_KEY_VI"
+      },
+      "default": {
+        "base_url": "http://localhost:8001",
+        "model": "omnivoice",
+        "voice": "default",
+        "format": "wav",
+        "key_env": "ONE_STUDIO_TTS_KEY"
+      }
+    },
+    "music": false,
+    "sfx": true,
+    "loudness": -14,
+    "sentence_pause": 0.25,
+    "scene_padding": 0.5
+  },
+  "render": {
+    "quality": "looks",
+    "preview_height": 540,
+    "out_dir": "out",
+    "codec": "h264",
+    "pix_fmt": "yuv420p"
+  },
+  "credit": {
+    "warn_scenes": 8,
+    "warn_types": [
+      "3d",
+      "character",
+      "explainer"
+    ]
+  },
+  "story": {
+    "playbook": "mechanism-system",
+    "tone": "knowing-friend",
+    "modes": [
+      "world-camera",
+      "exploded-cutaway",
+      "match-cut-motif"
+    ]
+  },
+  "outputs": {
+    "preview": {
+      "path": "out/gps-world-preview.mp4",
+      "hash": "cd40b968b6aa",
+      "at": "2026-10-21T18:11:17.176Z",
+      "duration": 60
+    }
+  }
+}

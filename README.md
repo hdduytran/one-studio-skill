@@ -14,7 +14,7 @@ Hoặc từ bản clone: `claude plugin marketplace add ./` rồi `claude plugin
 
 | Thành phần | Bắt buộc | Ghi chú |
 |---|---|---|
-| Node.js ≥ 20 | ✓ | chạy mọi script |
+| Node.js ≥ 20 | ✓ | chạy mọi script (≥ 22 cho `capture-screen.mjs`) |
 | FFmpeg + FFprobe | ✓ | ghép, trộn âm, phụ đề, loudnorm. Thiếu libass (FFmpeg 8 của Homebrew) → phụ đề "in cứng" tự chuyển sang phụ đề mềm; thiếu drawtext → contact sheet không có nhãn |
 | Chrome Headless Shell | ✓ | `npx hyperframes@0.8.181 browser ensure`, hoặc đặt `HYPERFRAMES_BROWSER_PATH` |
 | Python 3 | khi dùng file `.lottie` | đọc zip |
@@ -43,15 +43,51 @@ Gõ `/one-studio` kèm yêu cầu, ví dụ `/one-studio làm video 40 giây gi�
 | Gate | Script chính |
 |---|---|
 | 0 Setup | `init-project.mjs <dir> [--series <tên>] [--lang vi] [--aspect 16:9] [--exports 16:9,9:16] [--dimension 2d] [--preset apple-light] [--captions none\|sidecar\|mux\|burn] [--tts-url …] [--probe-tts]` |
-| 1–4 Brief, kịch bản, storyboard, ước tính | `status.mjs <dir> [--estimate] [--approve <gate>]` |
-| 5 Keyframe | `prepare-project.mjs`, `new-scene.mjs`, `keyframe-stills.mjs` (cả các tỉ lệ xuất), `compare-presets.mjs`, `status.mjs --approve-scenes` |
+| 1 Brief | điền `brief.md` kèm Story core (skill `writers-room`), `status.mjs <dir> --approve brief` |
+| 2 Kịch bản | `script-lint.mjs <dir>` (luật cấm, câu > 20 từ, số chưa viết cho tai, thiếu cột hình, fact thiếu nguồn) + đọc to, rồi `status.mjs --approve script` |
+| 3–4 Storyboard, ước tính | chọn mode/world/camera, `status.mjs <dir> [--estimate] [--approve <gate>]` |
+| 5 Keyframe | `prepare-project.mjs`, `new-scene.mjs`, `capture-screen.mjs` (scene `screen`), `keyframe-stills.mjs` (cả các tỉ lệ xuất, kèm `review/seams.jpg`), `seam-check.mjs`, `compare-presets.mjs`, `status.mjs --approve-scenes` |
 | 6 Build | `render-changed-scenes.mjs --preview` |
 | 7 Audio | `make-music.mjs --samples`, `audio-picker.mjs`, `make-music.mjs --use <nhạc\|none>`, `status.mjs --captions <mode>`, `build-audio.mjs [--allow-tts]` |
 | 8 Preview | `concat-and-mix.mjs --preview` |
 | 9 Render | `render-changed-scenes.mjs`, `concat-and-mix.mjs` |
 | 10 Publish | `publish.mjs [--ratios 9:16,1:1] [--thumb-frame s02@3.5]` |
 
-Công cụ khác: `validate.mjs`, `brand-to-css.mjs`, `optimize-assets.mjs`, `anatomy-to-svg.mjs`, `new-remotion.mjs`, `series-bumper.mjs`, `make-sfx.mjs`, `sync-lines.mjs`, `tts-openai-compatible.mjs --probe | --voices | --samples all | --use-voice <id>`, `check-external.mjs`.
+Công cụ khác: `script-lint.mjs`, `seam-check.mjs`, `capture-screen.mjs`, `validate.mjs`, `brand-to-css.mjs`, `optimize-assets.mjs`, `anatomy-to-svg.mjs`, `new-remotion.mjs`, `series-bumper.mjs`, `make-sfx.mjs`, `sync-lines.mjs`, `tts-openai-compatible.mjs --probe | --voices | --samples all | --use-voice <id>`, `check-external.mjs`.
+
+## Viết kịch bản: writers-room
+
+Skill `writers-room` (gọi từ gate 1–3) viết kịch bản như người đã nghiên cứu chủ đề, không như khuôn mẫu:
+
+- **14 playbook** theo thể loại (`mechanism-system`, `concept-explainer`, `news-recap`, `saas-product`, `customer-story`…), mỗi cái một khung xương có tỉ lệ thời lượng; chỉ nạp một playbook, chọn bằng `playbooks/index.md`.
+- **4 định dạng** chồng lên playbook (chọn tối đa một): `short-vertical`, `long-form`, `series-episode`, `no-voice`. **5 giọng** (`tones.md`): `knowing-friend`, `dry-expert`, `playful`, `neutral-newsroom`, `cinematic-minimal`.
+- **Story core** trong `brief.md`: angle một câu, con người thật, xung đột, hiểu lầm phổ biến, chi tiết chỉ chủ đề này có, góc nhìn/giọng, lời hứa và chỗ trả lời hứa, nguồn. Lựa chọn ghi ở `studio.json → story`.
+- **Kịch bản hai cột**: lời đọc (mỗi gạch đầu dòng một câu ≤ 20 từ) và hình (`> visual:`, `> camera:`, `> sfx:`, `> silence:`, `> source:`).
+- **`script-lint.mjs`** bắt cụm sáo rỗng vi/en, câu quá dài, số chưa viết cho tai, chuỗi "và rồi", thiếu cột hình, fact thiếu nguồn; sau đó đọc to và cắt khoảng 20%.
+- **Mode hình ảnh** (`visual-modes/`): `world-camera`, `match-cut-motif`, `exploded-cutaway`, `screen-cinema`, `kinetic-type`… mỗi scene khai `mode` trong storyboard.
+
+## Thế giới liên tục
+
+Nhiều scene dùng chung một "thế giới" (`worlds/<id>.html`, khai ở `storyboard.json → worlds`). Mỗi scene chỉ là một đoạn đường của camera:
+
+- `S.camera(...)` bay giữa các `data-place` của thế giới (`camera.from` → `camera.to`, scene sau bắt đầu đúng chỗ scene trước kết thúc); `S.state(id, tên, { at })` đổi trạng thái đối tượng; `exit_state` / `enter_state` giữ trạng thái qua mối nối.
+- Validator kiểm camera nối liền; `new-scene.mjs` đặt chuyển cảnh `cut` giữa các scene cùng world.
+- **Seam check** (`seam-check.mjs`, tự chạy trong `keyframe-stills.mjs`): khung cuối scene A cạnh khung đầu scene B kèm độ lệch điểm ảnh (`review/seams.jpg`); cùng world mà lệch > 2% thì báo lỗi. Cặp `handoff` (match cut theo motif) chỉ để mắt người xem xét.
+- Sửa một scene chỉ render lại scene đó.
+
+## Quay màn hình
+
+Scene `screen` dùng video thật quay từ một trang web theo kịch bản trong `flows/<id>.json` (schema `flow.schema.json`):
+
+- `capture-screen.mjs <dir> <flow-id>` mở Chrome, đi theo flow (click, gõ, cuộn, đánh dấu), ghi video cố định fps cùng `events.json` (đường đi con trỏ, vùng click). Scene zoom theo vùng click như Screen Studio. Con trỏ sinh từ seed nên log lặp lại được; chỉ quay lại khi flow đổi hoặc `--recapture`.
+- **Cần đồng ý của bạn**: `studio.json → services.capture: true` và chỉ URL bạn đưa. Chỉ điều hướng trong origin của flow, từ chối gõ vào ô mật khẩu; đăng nhập chỉ bằng storage state bạn cung cấp.
+- Yêu cầu: Node ≥ 22 (chạy `capture-screen.mjs`), Chrome, FFmpeg. Thời gian quay thật ~30 giây mỗi flow.
+
+## Tin tức
+
+- Video tin tức/sự thật: research **chỉ khi bạn yêu cầu** và `services.web: true`; chạy trong subagent, agent chính chỉ đọc `research.md`.
+- Mỗi dòng `research.md` có loại `fact | quote | opinion | context`, nguồn, URL, ngày đăng, ngày truy cập, người nói. Fact tin tức cần ≥ 2 nguồn độc lập; trích dẫn nguyên văn.
+- Câu có nguồn ghi `> source: r1,r2`; lint kiểm id tồn tại. Ý kiến được nói là ý kiến và hiện nhãn **Ý KIẾN** trên hình. `publish.mjs` đưa danh sách nguồn vào `out/manifest.json` và `out/sources.txt`.
 
 ## Cách hoạt động
 
@@ -69,6 +105,7 @@ Công cụ khác: `validate.mjs`, `brand-to-css.mjs`, `optimize-assets.mjs`, `an
 npm test                 # node:test, không cần mạng
 npm run test:e2e         # render thật (cần Chrome + FFmpeg)
 npm run validate:demo    # examples/demo
+npm run validate:gps     # examples/gps-world (mẫu: thế giới liên tục)
 npm run validate:plugin  # claude plugin validate
 ```
 

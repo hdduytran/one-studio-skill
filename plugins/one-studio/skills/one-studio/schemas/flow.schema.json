@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://one-studio.local/flow.schema.json",
+  "title": "one-studio screen flow",
+  "description": "Scripted walk through a web page, recorded by capture-screen.mjs. Lives at flows/<id>.json.",
+  "type": "object",
+  "required": ["url", "steps"],
+  "additionalProperties": false,
+  "properties": {
+    "url": {
+      "type": "string",
+      "pattern": "^https?://",
+      "description": "The only page (and origin) the recorder opens."
+    },
+    "viewport": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "width": { "type": "integer", "minimum": 320, "maximum": 3840 },
+        "height": { "type": "integer", "minimum": 240, "maximum": 2160 },
+        "deviceScaleFactor": { "type": "number", "minimum": 1, "maximum": 3 }
+      }
+    },
+    "storage_state": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Path (relative to the project) to a Playwright-style storage state JSON the user supplies: signed-in sessions without typing a password."
+    },
+    "fps": { "type": "integer", "minimum": 10, "maximum": 60 },
+    "seed": { "type": "integer", "description": "Seeds the cursor paths; default derives from the flow id." },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "oneOf": [
+          { "$ref": "#/$defs/goto" },
+          { "$ref": "#/$defs/click" },
+          { "$ref": "#/$defs/type" },
+          { "$ref": "#/$defs/press" },
+          { "$ref": "#/$defs/scroll" },
+          { "$ref": "#/$defs/hover" },
+          { "$ref": "#/$defs/wait" },
+          { "$ref": "#/$defs/mark" }
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "selector": { "type": "string", "minLength": 1 },
+    "goto": {
+      "type": "object",
+      "required": ["goto"],
+      "additionalProperties": false,
+      "properties": { "goto": { "type": "string", "minLength": 1, "description": "Absolute URL on the flow's origin, or a path." } }
+    },
+    "click": {
+      "type": "object",
+      "required": ["click"],
+      "additionalProperties": false,
+      "properties": { "click": { "$ref": "#/$defs/selector" } }
+    },
+    "type": {
+      "type": "object",
+      "required": ["type", "text"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "$ref": "#/$defs/selector" },
+        "text": { "type": "string" },
+        "cps": { "type": "number", "exclusiveMinimum": 0, "maximum": 40, "description": "Characters per second (default 14)." }
+      }
+    },
+    "press": {
+      "type": "object",
+      "required": ["press"],
+      "additionalProperties": false,
+      "properties": { "press": { "enum": ["Enter", "Tab", "Escape", "Backspace", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageDown", "PageUp", "Home", "End", "Space"] } }
+    },
+    "scroll": {
+      "type": "object",
+      "required": ["scroll"],
+      "additionalProperties": false,
+      "properties": {
+        "scroll": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "to": { "description": "Selector to bring into view, or an absolute y in px.", "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "number", "minimum": 0 }] },
+            "by": { "type": "number", "description": "Relative y in px." }
+          }
+        }
+      }
+    },
+    "hover": {
+      "type": "object",
+      "required": ["hover"],
+      "additionalProperties": false,
+      "properties": { "hover": { "$ref": "#/$defs/selector" } }
+    },
+    "wait": {
+      "type": "object",
+      "required": ["wait"],
+      "additionalProperties": false,
+      "properties": { "wait": { "description": "Milliseconds to hold on screen, or a selector to wait for (not recorded).", "anyOf": [{ "type": "number", "minimum": 0, "maximum": 30000 }, { "type": "string", "minLength": 1 }] } }
+    },
+    "mark": {
+      "type": "object",
+      "required": ["mark"],
+      "additionalProperties": false,
+      "properties": { "mark": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" } }
+    }
+  }
+}

@@ -32,8 +32,13 @@ S.lottie(sel, window.LOTTIE[name], { loop, speed });
 S.lines({ kind, offset });              // reveal every [data-line="s02-2"] when its VO sentence starts (see Pacing)
 S.line("s02-2", fallback)               // that sentence's start in scene seconds (for custom tweens)
 S.tl                                    // raw GSAP timeline for anything else (absolute positions)
+S.camera(from, to, { move, ease, at, dur }) // world scenes: place id or {x,y,zoom}; move cut|push|fly|orbit|follow; dur defaults to the rest of the scene
+S.state("beacon", "signal", { at });    // world scenes: switch a world element's data-state (instant, deterministic)
 S.done();                               // transitions from data-transition-in/out or brand default — always call last
 ```
+
+## Visual modes
+Staging styles (world camera, match cut, exploded view, desk collage…) live in `writers-room/visual-modes/`; the storyboard `mode`/`world`/`motif` fields point at them. For a hand-made judder (`motion: "stepped-12"`), add `data-motion="stepped-12"` to the scene root and call `S.done()` last: the timeline is sampled at 12 steps/s while the render stays at full fps.
 
 ## Pacing
 - Hook within 3 s; one idea per scene; text on screen ≤ 12 words at once.

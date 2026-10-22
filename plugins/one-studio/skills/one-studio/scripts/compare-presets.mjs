@@ -8,7 +8,7 @@
 // Fonts come from the local @fontsource cache (--offline: fallbacks only, no fetch).
 import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, symlinkSync, writeFileSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import { ENGINE_VERSIONS, isMain, loadProject, parseArgs, sceneEngine, writeJson } from "./lib/project.mjs";
+import { ENGINE_VERSIONS, isMain, linkSharedDirs, loadProject, parseArgs, sceneEngine, writeJson } from "./lib/project.mjs";
 import { applyPreset, loadPresets } from "./lib/presets.mjs";
 import { buildIndex, sceneFile } from "./lib/scenes.mjs";
 import { run } from "./lib/ffmpeg.mjs";
@@ -26,6 +26,7 @@ function stagePreset(project, name, ids, { offline }) {
   mkdirSync(join(assets, "fonts"), { recursive: true });
   const src = join(project.root, "assets");
   for (const entry of existsSync(src) ? readdirSync(src) : []) if (!OWN.has(entry)) symlinkSync(join(src, entry), join(assets, entry));
+  linkSharedDirs(project.root, root);
   for (const f of existsSync(join(src, "fonts")) ? readdirSync(join(src, "fonts")) : []) copyFileSync(join(src, "fonts", f), join(assets, "fonts", f));
   const brand = { ...applyPreset(project.brand, name), name: `${project.brand.name} · ${name}` };
   let warning = null;

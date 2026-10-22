@@ -20,7 +20,7 @@ export function prepareProject(dir, { offline = false, svgo = true } = {}) {
   mkdirSync(join(project.root, "scenes"), { recursive: true });
   mkdirSync(assets, { recursive: true });
   if (!existsSync(join(project.root, "hyperframes.json"))) copyFileSync(join(tpl, "hyperframes.json"), join(project.root, "hyperframes.json"));
-  for (const f of ["os.css", "os.js"]) copyFileSync(join(tpl, "assets", f), join(assets, f));
+  for (const f of ["os.css", "os.js", "camera.js", "screen.js"]) copyFileSync(join(tpl, "assets", f), join(assets, f));
   vendorGsap(assets);
   vendorHowler(assets);
   const types = new Set((project.storyboard?.scenes ?? []).map((s) => s.type));

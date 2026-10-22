@@ -23,11 +23,12 @@ Per scene to build, by cost level of its type:
 | — | explainer size `hero` | 40k–80k |
 
 Plus:
-- each reference file loaded once per session: its size / 4 (1.5k when not measurable),
+- world scenes (`scene.world`): the camera move needs a longer scene (usually 6–10 s) and the world file is written once, so count its tokens once (medium), not per scene; each same-world pair adds a seam snapshot (~5 s of local time) at gate 5,
+- `screen` scenes: medium tokens; capture time is real-time, ~30 s per flow (`capture-screen.mjs`), local and free, only after the user's consent,- each reference file loaded once per session: its size / 4 (1.5k when not measurable),
 - keyframe review: ~1.6k per scene (one contact-sheet image),
 - upper bound × 1.3 for fix-up rounds.
 
-Render time (local, rough): seconds of video × 2.5 (HyperFrames), × 3 (lemo), × 4 (Remotion), + 5 s start-up per scene.
+Render time (local, rough): seconds of video × 2.5 (HyperFrames), × 3 (lemo), × 4 (Remotion), + 5 s start-up per scene; seam checks ~5 s per same-world pair; screen capture ~30 s per flow.
 
 ## Warnings (⚠) — stop and ask
 

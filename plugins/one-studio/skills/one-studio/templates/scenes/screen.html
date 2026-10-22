@@ -1,0 +1,23 @@
+  <!-- Recorded flow: the links make the scene hash follow the flow, the video and the event log. -->
+  <link rel="x-flow" href="../flows/{{flow_id}}.json" />
+  <link rel="x-screen" href="../capture/{{flow_id}}/events.json" />
+  <div class="os-frame scr-outer">
+    <div class="scr-stage" data-screen="{{screen_options}}">
+      <div class="scr-frame">
+        <div class="scr-bar"><i></i><i></i><i></i></div>
+        <div class="scr-screen">
+          <video class="clip" id="{{id}}-rec" src="../capture/{{flow_id}}/video.mp4" muted playsinline data-start="0" data-duration="{{video_duration}}" data-media-start="{{media_start}}" data-track-index="0"></video>
+        </div>
+      </div>
+      <svg class="scr-cursor" viewBox="0 0 21 30" aria-hidden="true"><path d="M3.2 4 L3.2 24 L8.2 19.5 L11.7 28 L15.2 26.5 L11.7 18.5 L18.2 18.5 Z" fill="black" fill-opacity="0.3" /><path d="M2 2 L2 22 L7 17.5 L10.5 26 L14 24.5 L10.5 16.5 L17 16.5 Z" fill="var(--c-fg)" stroke="var(--c-bg)" stroke-width="1.6" stroke-linejoin="round" /></svg>
+    </div>
+  </div>
+</div>
+<script>
+  const S = OS.scene("{{id}}");
+  // Zoom, cursor, ripples and blur come from the recorded events; options live in data-screen (storyboard "screen").
+  OS_SCREEN.mount(S);
+  S.done();
+</script>
+</body>
+</html>

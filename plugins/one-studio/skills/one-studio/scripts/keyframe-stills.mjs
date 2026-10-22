@@ -6,56 +6,18 @@
 //   node keyframe-stills.mjs <project-dir> [scene-id…] [--all] [--frames 1|2|3] [--ratios 9:16,1:1 | --no-exports]
 // Output: review/<id>/frame-*.png, review/sheet.jpg, review/<ratio>/<id>/…, review/sheet-<ratio>.jpg.
 // Labels need FFmpeg's drawtext (freetype); builds without it (Homebrew FFmpeg 8) get unlabelled sheets.
-import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, rmSync } from "node:fs";
 import { join, relative } from "node:path";
 import { ASPECTS, isMain, loadProject, parseArgs, sceneEngine } from "./lib/project.mjs";
 import { sceneHash, sceneSourceExists } from "./lib/hash.mjs";
 import { ENGINES, engineFor, reviewTimes } from "./lib/engines.mjs";
-import { hasDrawtext, run } from "./lib/ffmpeg.mjs";
+import { hasDrawtext } from "./lib/ffmpeg.mjs";
+import { contactSheet, findFont } from "./lib/contact-sheet.mjs";
+import { formatSeams, seamCheck } from "./seam-check.mjs";
+import { seamPairs } from "./lib/visual-refs.mjs";
 import { ratioTag, variantHash, variantRoot } from "./lib/variants.mjs";
 
-export { hasDrawtext };
-
-// A font for the labels, or null when this FFmpeg cannot draw text at all.
-export function findFont() {
-  if (!hasDrawtext()) return null;
-  for (const f of ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "/System/Library/Fonts/Supplemental/Arial Bold.ttf", "C:/Windows/Fonts/arialbd.ttf"]) {
-    if (existsSync(f)) return f;
-  }
-  try {
-    return execFileSync("fc-match", ["-f", "%{file}", "sans:bold"], { encoding: "utf8" }).trim() || null;
-  } catch {
-    return null;
-  }
-}
-
-const esc = (s) => s.replace(/\\/g, "\\\\").replace(/:/g, "\\:").replace(/'/g, "\\'");
-
-// One row per scene: its stills side by side, labelled "<id> · <t>s".
-export function contactSheet(rows, out, { tileWidth = 480 } = {}) {
-  const font = findFont();
-  const cols = Math.max(...rows.map((r) => r.stills.length));
-  const inputs = [];
-  const filters = [];
-  let n = 0;
-  rows.forEach((row, ri) => {
-    const cells = [];
-    for (let c = 0; c < cols; c++) {
-      const still = row.stills[c] ?? row.stills[row.stills.length - 1];
-      inputs.push("-i", still);
-      const label = row.labels?.[c] ?? `${row.id} · ${row.times[c] ?? ""}s${row.note ? ` · ${row.note}` : ""}`;
-      const text = `,pad=iw:ih+${font ? 34 : 6}:0:${font ? 34 : 6}:color=0x1b1d22${font ? `,drawtext=fontfile='${esc(font)}':text='${esc(label)}':x=10:y=7:fontsize=20:fontcolor=white` : ""}`;
-      filters.push(`[${n}:v]scale=${tileWidth}:-2${text}[c${ri}_${c}]`);
-      cells.push(`[c${ri}_${c}]`);
-      n++;
-    }
-    filters.push(cols > 1 ? `${cells.join("")}hstack=inputs=${cols}[r${ri}]` : `${cells[0]}null[r${ri}]`);
-  });
-  filters.push(rows.length > 1 ? `${rows.map((_, i) => `[r${i}]`).join("")}vstack=inputs=${rows.length}[out]` : "[r0]null[out]");
-  run("ffmpeg", ["-y", "-v", "error", ...inputs, "-filter_complex", filters.join(";"), "-map", "[out]", "-frames:v", "1", "-q:v", "3", out]);
-  return out;
-}
+export { contactSheet, findFont, hasDrawtext };
 
 // Other export ratios: one middle still per scene, rendered from the resized variant (HyperFrames, lemo).
 // Remotion scenes are fitted from their main clip at publish, so they have nothing new to show here.
@@ -86,6 +48,17 @@ function ratioStills(project, scenes, aspect, { all, ids }) {
   const flat = [{ id: "", times: rows.map((r) => r.times[0]), stills: rows.map((r) => r.stills[0]), labels: rows.map((r) => `${r.id} · ${aspect}`) }];
   const sheet = contactSheet(rows.length > 1 ? flat : rows, join(project.root, "review", `sheet-${tag}.jpg`), { tileWidth: 300 });
   return { aspect, scenes: rows.map((r) => r.id), sheet };
+}
+
+// Same-world and handoff pairs that touch a captured scene. A bad seam is a warning here (gate 5 shows it), never a failure.
+function checkSeams(project, ids) {
+  const pairs = seamPairs(project.storyboard ?? { scenes: [] }).filter((p) => ids.includes(p.a) || ids.includes(p.b));
+  if (!pairs.length) return null;
+  try {
+    return seamCheck(project.root, { pairs });
+  } catch (err) {
+    return { rows: [], sheet: null, failed: [], warning: `seam check skipped: ${err.message.split("\n")[0]}` };
+  }
 }
 
 export function keyframeStills(dir, { ids = [], all = false, frames = 3, ratios = null } = {}) {
@@ -121,8 +94,9 @@ export function keyframeStills(dir, { ids = [], all = false, frames = 3, ratios 
   for (const r of extra) if (!ASPECTS[r]) throw new Error(`unknown aspect ${r}; use ${Object.keys(ASPECTS).join(", ")}`);
   const ratioSheets = extra.map((r) => ratioStills(project, project.storyboard?.scenes ?? [], r, { all, ids })).filter(Boolean);
   project.save();
+  const seams = checkSeams(project, rows.map((r) => r.id));
   rmSync(join(project.root, ".one-studio", "stage"), { recursive: true, force: true });
-  return { project, rows, skipped, sheet, ratioSheets, labels: Boolean(findFont()) };
+  return { project, rows, skipped, sheet, ratioSheets, seams, labels: Boolean(findFont()) };
 }
 
 if (isMain(import.meta.url)) {
@@ -140,6 +114,12 @@ if (isMain(import.meta.url)) {
     for (const s of r.skipped) console.log(`· skipped ${s}`);
     for (const x of r.ratioSheets) console.log(`✓ ${x.aspect}: ${x.scenes.join(", ")} → ${relative(process.cwd(), x.sheet) || x.sheet}`);
     if (!r.labels && (r.sheet || r.ratioSheets.length)) console.log("· this FFmpeg has no drawtext (freetype): sheets are unlabelled; rows follow storyboard order");
+    if (r.seams?.warning) console.log(`· ${r.seams.warning}`);
+    if (r.seams?.rows.length) {
+      console.log(formatSeams(r.seams));
+      console.log(`Seams sheet: ${relative(process.cwd(), r.seams.sheet) || r.seams.sheet}`);
+      if (r.seams.failed.length) console.log(`! ${r.seams.failed.length} same-world seam(s) above ${(r.seams.threshold * 100).toFixed(1)}%: make the camera/state at the end of one scene equal the start of the next`);
+    }
     if (r.sheet) console.log(`Contact sheet: ${relative(process.cwd(), r.sheet) || r.sheet}\nShow it to the user, then: status.mjs <dir> --approve-scenes <ids|all>`);
     if (r.ratioSheets.length) console.log("Export ratios are for review only (approval follows the main ratio). Fix them with <style data-ratio=\"9:16\"> blocks: the main ratio's approval and clips stay valid.");
   } catch (err) {

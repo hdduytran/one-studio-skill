@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1920, height=1080" />
+<!-- one-studio scene s01 (diagram). Edit content and the timeline only; styles come from brand tokens. -->
+<link rel="stylesheet" href="../assets/brand.css" />
+<link rel="stylesheet" href="../assets/os.css" />
+<script src="../assets/vendor/gsap.min.js"></script>
+<script src="../assets/camera.js"></script>
+<script src="../assets/brand.js"></script>
+<!-- studio preview of storyboard SFX cues (never in renders; the final mix is FFmpeg's) -->
+<script src="../assets/vendor/howler.core.min.js"></script>
+<script src="../assets/audio-cues.js"></script>
+<script src="../assets/os.js"></script>
+</head>
+<body>
+<div id="root" class="os-scene" data-composition-id="s01" data-start="0" data-duration="8" data-width="1920" data-height="1080"
+     data-transition-in="cut" data-transition-out="cut" data-transition-duration="0"
+     style="--w: 1920px; --h: 1080px">
+  <link rel="x-world" href="../worlds/gps.html" />
+  <div class="os-world" data-world="gps" data-world-w="4266" data-world-h="2400" data-camera="{&quot;from&quot;:&quot;street&quot;,&quot;to&quot;:{&quot;x&quot;:2133,&quot;y&quot;:1200,&quot;zoom&quot;:1},&quot;move&quot;:&quot;push&quot;,&quot;at&quot;:3.7}" data-exit-state="{&quot;screen&quot;:&quot;fixed&quot;}"></div>
+  <div class="os-frame clip" data-start="0" data-duration="8" data-track-index="0" style="justify-content: flex-start; align-items: flex-start">
+    <h2 class="os-h2 os-muted title">GPS hoạt động thế nào</h2>
+  </div>
+</div>
+<script>
+  const S = OS.scene("s01");
+  const EX = 110; // how far the satellite shell opens (matches --ex of the open state)
+  const REST = 60; // resting hand angle in degrees (a full turn of steps returns to it)
+  const SAT = { 1: [810, 540], 2: [1640, 310], 3: [2640, 340], 4: [3500, 600] };
+  const PHONE = [2210, 1430];
+  const WHOLE = { x: 2133, y: 1200, zoom: 1 };
+  const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+  const lerp = (a, b, u) => a + (b - a) * u;
+  const smooth = (u) => u * u * (3 - 2 * u);
+  const el = (sel) => S.q(sel)[0];
+  // The signal pulse: its place is the --tx / --ty pair; pop sets its look.
+  const setTick = (id, x, y, scale, alpha) => {
+    const g = el("#" + id), body = g.firstElementChild;
+    g.style.setProperty("--tx", x);
+    g.style.setProperty("--ty", y);
+    body.style.opacity = alpha;
+    body.style.transform = "scale(" + scale + ")";
+  };
+  const setHand = (sel, deg, len) => {
+    const h = el(sel), a = (deg * Math.PI) / 180;
+    h.setAttribute("x2", (len * Math.sin(a)).toFixed(2));
+    h.setAttribute("y2", (-len * Math.cos(a)).toFixed(2));
+  };
+
+  // The person is the viewer: a phone, a crossroads, a blue dot. Then the camera leaves the street and finds the sky.
+  S.enter(".title", { at: 0.3, kind: "fade" });
+  S.exit(".title", { at: 2.4 });
+  const dotAt = S.line("s01-1", 0) + 2.7;
+  S.state("screen", "fixed", { at: dotAt });
+  S.camera("street", WHOLE, { move: "push", at: S.line("s01-2", 3.7), ease: "power2.inOut" });
+  S.done();
+</script>
+</body>
+</html>

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1920, height=1080" />
+<!-- one-studio scene s03 (diagram). Edit content and the timeline only; styles come from brand tokens. -->
+<link rel="stylesheet" href="../assets/brand.css" />
+<link rel="stylesheet" href="../assets/os.css" />
+<script src="../assets/vendor/gsap.min.js"></script>
+<script src="../assets/camera.js"></script>
+<script src="../assets/brand.js"></script>
+<!-- studio preview of storyboard SFX cues (never in renders; the final mix is FFmpeg's) -->
+<script src="../assets/vendor/howler.core.min.js"></script>
+<script src="../assets/audio-cues.js"></script>
+<script src="../assets/os.js"></script>
+</head>
+<body>
+<div id="root" class="os-scene" data-composition-id="s03" data-start="0" data-duration="10" data-width="1920" data-height="1080"
+     data-transition-in="cut" data-transition-out="cut" data-transition-duration="0"
+     style="--w: 1920px; --h: 1080px">
+  <link rel="x-world" href="../worlds/gps.html" />
+  <div class="os-world" data-world="gps" data-world-w="4266" data-world-h="2400" data-camera="{&quot;from&quot;:&quot;sat2&quot;,&quot;to&quot;:&quot;street&quot;,&quot;move&quot;:&quot;follow&quot;,&quot;dur&quot;:6}" data-enter-state="{&quot;screen&quot;:&quot;fixed&quot;,&quot;sat2&quot;:&quot;open&quot;,&quot;tick&quot;:&quot;at-sat2&quot;}" data-exit-state="{&quot;screen&quot;:&quot;fixed&quot;,&quot;sat2&quot;:&quot;idle&quot;,&quot;tick&quot;:&quot;at-phone&quot;,&quot;trail&quot;:&quot;on&quot;}"></div>
+  <div class="os-frame clip" data-start="0" data-duration="10" data-track-index="0" style="justify-content: flex-start; align-items: flex-start; padding-top: calc(190 * var(--u))">
+    <div class="os-card ms" style="text-align: center">
+      <div class="os-h1 os-accent">≈ 67 ms</div>
+      <div class="os-small os-muted">từ vệ tinh xuống tay bạn</div>
+    </div>
+  </div>
+</div>
+<script>
+  const S = OS.scene("s03");
+  const EX = 110; // how far the satellite shell opens (matches --ex of the open state)
+  const REST = 60; // resting hand angle in degrees (a full turn of steps returns to it)
+  const SAT = { 1: [810, 540], 2: [1640, 310], 3: [2640, 340], 4: [3500, 600] };
+  const PHONE = [2210, 1430];
+  const WHOLE = { x: 2133, y: 1200, zoom: 1 };
+  const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+  const lerp = (a, b, u) => a + (b - a) * u;
+  const smooth = (u) => u * u * (3 - 2 * u);
+  const el = (sel) => S.q(sel)[0];
+  // The signal pulse: its place is the --tx / --ty pair; pop sets its look.
+  const setTick = (id, x, y, scale, alpha) => {
+    const g = el("#" + id), body = g.firstElementChild;
+    g.style.setProperty("--tx", x);
+    g.style.setProperty("--ty", y);
+    body.style.opacity = alpha;
+    body.style.transform = "scale(" + scale + ")";
+  };
+  const setHand = (sel, deg, len) => {
+    const h = el(sel), a = (deg * Math.PI) / 180;
+    h.setAttribute("x2", (len * Math.sin(a)).toFixed(2));
+    h.setAttribute("y2", (-len * Math.cos(a)).toFixed(2));
+  };
+
+  // The camera rides with the pulse: it stays in the middle of the frame while the world slides past.
+  const sat = el("#sat2"), lbl = el("#sat2 .g-lbl");
+  const travel = 6;
+  S.camera("sat2", "street", { move: "follow", dur: travel });
+  S.state("trail", "on", { at: 0 });
+  S.draw("#trail path", { at: 0, dur: travel, ease: "none" });
+  S.state("sat2", "idle", { at: 1.2 });
+  S.state("tick", "at-phone", { at: travel });
+  S.enter(".ms", { at: S.line("s03-1", 0) + 2.8, kind: "up" });
+  S.exit(".ms", { at: S.dur - 1 });
+  S.drive((t) => {
+    const close = 1 - smooth(clamp((t - 0.25) / 0.85));
+    sat.style.setProperty("--ex", (EX * close).toFixed(3));
+    lbl.style.opacity = close;
+    const u = clamp(t / travel);
+    const land = clamp((t - travel) / 0.6);
+    setTick("tick", lerp(SAT[2][0], PHONE[0], u), lerp(SAT[2][1], PHONE[1], u), 1 + 0.5 * Math.sin(Math.PI * land), 1);
+  }, { at: 0 });
+  S.done();
+</script>
+</body>
+</html>

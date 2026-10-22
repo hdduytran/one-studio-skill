@@ -4,6 +4,7 @@ import { existsSync, statSync } from "node:fs";
 import { sceneHash, sceneSourceExists } from "./hash.mjs";
 import { join } from "node:path";
 import { SCENE_TYPES, SKILL_DIR, sceneEngine } from "./project.mjs";
+import { captureFiles } from "./flow.mjs";
 
 // Tokens Claude spends writing + fixing one scene, by cost level [low, high].
 export const LEVEL_TOKENS = { low: [2000, 4000], medium: [5000, 9000], high: [15000, 30000] };
@@ -13,6 +14,7 @@ const DEFAULT_REF_TOKENS = 1500; // reference not written yet
 // Render seconds per output second on a typical laptop, plus fixed start-up per scene.
 const RENDER_RATE = { hyperframes: 2, remotion: 4, lemo: 3 };
 const RENDER_OVERHEAD = 5;
+const CAPTURE_SECONDS = 30; // recording one flow: browser start-up plus the walk-through in real time
 
 const refTokens = (rel) => {
   const path = join(SKILL_DIR, rel);
@@ -26,6 +28,7 @@ export function estimate(project) {
   const rows = [];
   const refs = new Set();
   const deps = new Set();
+  const flows = new Set(); // screen flows without a recording yet
   let ttsLines = 0;
   let ttsChars = 0;
 
@@ -39,6 +42,7 @@ export function estimate(project) {
     const cached = authored && rendered;
     const engine = sceneEngine(scene, project.studio);
     const range = scene.type === "explainer" && scene.explainer?.size === "hero" ? HERO_EXPLAINER : LEVEL_TOKENS[info.level];
+    if (scene.type === "screen" && scene.screen?.flow && !existsSync(captureFiles(project, scene.screen.flow).events)) flows.add(scene.screen.flow);
     const lines = scene.lines ?? [];
     ttsLines += lines.length;
     ttsChars += lines.reduce((n, l) => n + (l.say ?? l.text).length, 0);
@@ -72,6 +76,7 @@ export function estimate(project) {
     const allowed = project.studio.services?.tts;
     services.push(`TTS (local, OpenAI-compatible): ${ttsLines} sentence calls, ${ttsChars} chars${allowed ? "" : " — ask before first call"}`);
   }
+  if (flows.size) services.push(`screen capture: record ${[...flows].join(", ")} (opens the flow URL in a browser${project.studio.services?.capture ? "" : " — ask before first capture"})`);
   for (const d of deps) services.push(`install/load: ${d}`);
 
   const warnings = [];
@@ -92,7 +97,7 @@ export function estimate(project) {
     tokens,
     reviewTokens: review,
     toRender: rows.filter((r) => !r.rendered).length,
-    renderSeconds: rows.reduce((n, r) => n + r.renderSeconds, 0),
+    renderSeconds: rows.reduce((n, r) => n + r.renderSeconds, 0) + flows.size * CAPTURE_SECONDS,
     services,
     warnings,
   };

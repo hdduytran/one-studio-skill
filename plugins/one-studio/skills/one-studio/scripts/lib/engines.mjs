@@ -3,7 +3,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { ENGINE_VERSIONS, sceneEngine } from "./project.mjs";
+import { ENGINE_VERSIONS, linkSharedDirs, sceneEngine } from "./project.mjs";
 import { run } from "./ffmpeg.mjs";
 import { effectiveDuration } from "./scenes.mjs";
 
@@ -31,7 +31,8 @@ function stageScene(project, id, { root = project.root, tag = id } = {}) {
   rmSync(stage, { recursive: true, force: true });
   mkdirSync(stage, { recursive: true });
   symlinkSync(join(root, "assets"), join(stage, "assets"), "dir");
-  const html = readFileSync(join(root, "scenes", `${id}.html`), "utf8").replace(/(["'(])\.\.\/assets\//g, "$1./assets/");
+  linkSharedDirs(root, stage);
+  const html = readFileSync(join(root, "scenes", `${id}.html`), "utf8").replace(/(["'(])\.\.\/(assets|worlds|capture|flows)\//g, "$1./$2/");
   writeFileSync(join(stage, "index.html"), html);
   return stage;
 }
