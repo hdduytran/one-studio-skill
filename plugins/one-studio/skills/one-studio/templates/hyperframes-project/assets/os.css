@@ -103,3 +103,24 @@ html, body { margin: 0; overflow: hidden; background: var(--c-bg); }
 
 /* Transition veil, driven by OS.scene().done() */
 .os-veil { position: absolute; inset: 0; background: var(--c-bg); pointer-events: none; z-index: 100; }
+
+/* World layer: a canvas in world units (1 unit = 1px) moved by S.camera; the scene's own frames sit above it. */
+.os-world { --u: 1px; position: absolute; left: 0; top: 0; transform-origin: 0 0; background: var(--c-bg); }
+
+/* Screen scenes (screen.js): a recording in a window/device frame; the stage carries the camera transform. */
+.scr-outer { display: block; padding: 0; overflow: hidden; }
+.scr-stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.scr-frame { position: absolute; background: var(--c-bg); box-shadow: 0 calc(24 * var(--u)) calc(64 * var(--u)) color-mix(in srgb, var(--c-fg) 18%, transparent); }
+/* The window outline is a shadow ring, not a border: a border on a clipping frame makes HyperFrames render the video with frame-to-frame differences. */
+.scr-frame[data-kind="window"] { border-radius: calc(16 * var(--u)); overflow: hidden; box-shadow: 0 0 0 calc(2 * var(--u)) color-mix(in srgb, var(--c-fg) 14%, transparent), 0 calc(24 * var(--u)) calc(64 * var(--u)) color-mix(in srgb, var(--c-fg) 18%, transparent); }
+.scr-frame[data-kind="device"] { border-radius: calc(44 * var(--u)); background: var(--c-fg); }
+.scr-frame[data-kind="none"] { box-shadow: none; background: transparent; }
+.scr-bar { position: absolute; left: 0; top: 0; right: 0; height: var(--scr-bar); display: flex; align-items: center; gap: calc(10 * var(--u)); padding-left: calc(18 * var(--u)); background: color-mix(in srgb, var(--c-fg) 8%, var(--c-bg)); }
+.scr-bar i { width: calc(14 * var(--u)); height: calc(14 * var(--u)); border-radius: 50%; background: var(--c-muted); opacity: 0.7; }
+.scr-screen { position: absolute; overflow: hidden; background: var(--c-bg); }
+.scr-frame[data-kind="device"] .scr-screen { border-radius: calc(26 * var(--u)); }
+.scr-frame[data-kind="none"] .scr-screen { border-radius: calc(12 * var(--u)); }
+.scr-screen video { display: block; }
+/* No filter: drop-shadow here: it makes HyperFrames capture by screenshot, and video frames then differ between renders. */
+.scr-cursor { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 5; }
+.scr-ripple { position: absolute; border-radius: 50%; border: calc(4 * var(--u)) solid var(--c-accent); pointer-events: none; opacity: 0; z-index: 4; }

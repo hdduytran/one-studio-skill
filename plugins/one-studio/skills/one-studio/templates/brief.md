@@ -18,3 +18,18 @@
 ## Key messages (max 3)
 
 1. <!-- TODO -->
+
+## Story core
+
+<!-- Written with the writers-room skill (templates/brief-story-core.md). Ask the user only what they have not said; never invent a person, quote or number. -->
+
+| Field | Value |
+|---|---|
+| Angle (one sentence: what this video says that others do not) | <!-- TODO --> |
+| Real person (who, where, what happened) | <!-- TODO or "none: concept video" --> |
+| Tension (what is in conflict or at risk) | <!-- TODO --> |
+| Common misconception | <!-- TODO --> |
+| Details only this topic has (3) | <!-- TODO --> |
+| Point of view / tone | <!-- TODO --> |
+| Promise and payoff | <!-- TODO --> |
+| Sources (link, date) | |

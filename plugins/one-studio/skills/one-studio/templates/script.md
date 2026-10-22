@@ -3,7 +3,7 @@
 <!--
 Gate 2. One "## <scene-id> · <title>" heading per scene, in playback order (ids: s01, s02, …).
 Each "- " bullet is ONE spoken sentence = one TTS call = one caption cue. Keep sentences ≤ 20 words.
-Optional "> visual:" line describes what is on screen. Delete the TODO lines, then ask the user to approve.
+Optional "> visual:" line describes what is on screen. For the two-column format (camera, sfx, silence, source) use writers-room/templates/script-av.md. Delete the TODO lines, then ask the user to approve.
 Rough timing: Vietnamese ≈ 2.8 words/s, English ≈ 2.5 words/s.
 -->
 

@@ -1,0 +1,17 @@
+[
+  { "phrase": "in today's ever-evolving", "severity": "error", "replace": "Name the specific change (year, event) instead." },
+  { "phrase": "in today's fast-paced", "severity": "error", "replace": "Name the specific change instead." },
+  { "regex": "\\bdelve(s|d)?\\b", "severity": "error", "replace": "Use 'dig into', 'look at', or just say it." },
+  { "phrase": "tapestry", "severity": "error", "replace": "Say what the parts actually are." },
+  { "regex": "\\bcrucial\\b", "severity": "warning", "replace": "Say what breaks without it." },
+  { "regex": "^in conclusion\\b", "severity": "error", "replace": "End on an image or the next thing the viewer does." },
+  { "regex": "^in summary\\b", "severity": "warning", "replace": "End on an image or the next thing the viewer does." },
+  { "phrase": "in this video", "severity": "warning", "replace": "Start with the story; the first sentence is already content." },
+  { "regex": "\\bhave you ever wondered\\b", "severity": "error", "replace": "Open on a concrete scene or a surprising number." },
+  { "regex": "\\blet's (dive|explore|unpack)\\b", "severity": "error", "replace": "Start with the thing itself." },
+  { "regex": "\\bgame[- ]chang(er|ing)\\b", "severity": "error", "replace": "Say what changed, by how much." },
+  { "phrase": "unlock the power", "severity": "error", "replace": "Say what you can do that you could not before." },
+  { "phrase": "seamless", "severity": "warning", "replace": "Show the step that disappeared." },
+  { "phrase": "it's important to note", "severity": "warning", "replace": "Just state the note." },
+  { "phrase": "revolutioniz", "severity": "warning", "replace": "Give the before and after number." }
+]

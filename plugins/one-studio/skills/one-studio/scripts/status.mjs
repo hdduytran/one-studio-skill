@@ -3,6 +3,7 @@
 //   node status.mjs <dir>                          gates + scenes + next step
 //   node status.mjs <dir> --estimate               credit / render-time table (gates 4, 5, 6, 9)
 //   node status.mjs <dir> --approve <gate>         record the user's approval (stores the gate's input hash)
+//                                                  script: runs script-lint.mjs first; lint errors refuse unless --force-lint
 //   node status.mjs <dir> --approve-scenes <ids|all>   keyframe approval per scene (gate 5)
 //   node status.mjs <dir> --captions none|sidecar|mux|burn   record the caption choice for this project (gate 0 / 7)
 //   add --json for machine-readable output
@@ -12,8 +13,9 @@ import { hasLibass } from "./lib/ffmpeg.mjs";
 import { currentGate, gateProblems, gateState } from "./lib/gates.mjs";
 import { sceneHash, sceneSourceExists } from "./lib/hash.mjs";
 import { estimate, formatEstimate } from "./lib/estimate.mjs";
+import { formatViolation, lintProject } from "./script-lint.mjs";
 
-const USAGE = 'usage: status.mjs <dir> [--estimate] [--approve <gate>] [--approve-scenes <ids|all>] [--captions none|sidecar|mux|burn] [--note "…"] [--json]';
+const USAGE = 'usage: status.mjs <dir> [--estimate] [--approve <gate>] [--force-lint] [--approve-scenes <ids|all>] [--captions none|sidecar|mux|burn] [--note "…"] [--json]';
 
 const NEXT = {
   setup: "Gate 0: confirm brand kit (preset?), 2D/3D, VO language + voice, captions (none/sidecar/mux/burn), allowed services; then init-project.mjs.",
@@ -36,7 +38,7 @@ function syncScenes(project) {
   return { added: ids.filter((id) => !old.has(id)), removed: [...old.keys()].filter((id) => !ids.includes(id)) };
 }
 
-export function approve(project, gateId, note) {
+export function approve(project, gateId, note, { forceLint = false } = {}) {
   const gate = GATES.find((g) => g.id === gateId);
   if (!gate) throw new Error(`Unknown gate "${gateId}". Gates: ${GATES.map((g) => g.id).join(", ")}`);
   for (const prev of GATES.slice(0, gate.n)) {
@@ -46,6 +48,12 @@ export function approve(project, gateId, note) {
   }
   const problems = gateProblems(project, gate);
   if (problems.length) throw new Error(`Cannot approve ${gate.id}:\n  ${problems.join("\n  ")}`);
+  if (gate.id === "script" && !forceLint) {
+    const errors = lintProject(project).filter((v) => v.severity === "error");
+    if (errors.length) {
+      throw new Error(`Cannot approve script: script-lint found ${errors.length} error(s). Fix them, or pass --force-lint if the user accepts them.\n  ${errors.map(formatViolation).join("\n  ")}`);
+    }
+  }
   let sync = null;
   if (["storyboard", "estimate"].includes(gate.id)) sync = syncScenes(project);
   const state = gateState(project, gate);
@@ -142,7 +150,7 @@ function printSummary(s) {
 }
 
 function main() {
-  const args = parseArgs(process.argv.slice(2), { flags: ["estimate", "json", "help"], options: ["approve", "approve-scenes", "note", "captions"] });
+  const args = parseArgs(process.argv.slice(2), { flags: ["estimate", "json", "help", "force-lint"], options: ["approve", "approve-scenes", "note", "captions"] });
   const dir = args._[0];
   if (args.help || !dir) {
     console.log(USAGE);
@@ -161,7 +169,7 @@ function main() {
     return;
   }
   if (args.approve) {
-    const result = approve(project, args.approve, args.note);
+    const result = approve(project, args.approve, args.note, { forceLint: Boolean(args["force-lint"]) });
     if (args.json) console.log(JSON.stringify(result));
     else {
       console.log(`✓ gate "${result.gate}" approved`);

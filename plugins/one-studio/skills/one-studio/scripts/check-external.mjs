@@ -2,7 +2,7 @@
 // Check the tools this project (or a named tool) needs, and print how to install what is missing.
 // Never installs anything: ask the user, then run the printed command.
 //   node check-external.mjs <project-dir>            everything the storyboard needs
-//   node check-external.mjs --tool anatomy|lemo|remotion|hyperframes|ffmpeg [<project-dir>]
+//   node check-external.mjs --tool anatomy|lemo|remotion|hyperframes|ffmpeg|capture [<project-dir>]
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
@@ -11,6 +11,7 @@ import { ENGINE_VERSIONS, isMain, loadProject, parseArgs, sceneEngine } from "./
 import { lemoLib } from "./lib/engines.mjs";
 import { hasDrawtext, hasLibass } from "./lib/ffmpeg.mjs";
 import { captionSetting } from "./lib/captions.mjs";
+import { cdpAvailable, findChrome } from "./lib/cdp.mjs";
 
 const has = (bin, args = ["-version"]) => spawnSync(bin, args, { encoding: "utf8" }).status === 0;
 
@@ -51,6 +52,22 @@ export const CHECKS = {
     const chrome = process.env.HYPERFRAMES_BROWSER_PATH;
     return { ok: has("npx", ["--version"]), detail: `npx hyperframes@${v}${chrome ? `, Chrome ${chrome}` : ""}`, install: `npx --yes hyperframes@${v} browser ensure   (downloads Chrome Headless Shell; or set HYPERFRAMES_BROWSER_PATH)` };
   },
+  // Screen capture drives Chrome over the DevTools protocol with Node's own WebSocket: no automation package to install.
+  capture: (project) => {
+    const chrome = findChrome();
+    const ws = cdpAvailable();
+    const consent = project ? project.studio.services?.capture === true : null;
+    const detail = [
+      chrome ? `Chrome ${chrome}` : "NO Chrome",
+      ws ? `Node ${process.version} (WebSocket ok)` : `Node ${process.version}: needs 22+ for the built-in WebSocket`,
+      consent === null ? "" : consent ? "services.capture on" : "services.capture off (ask the user, then set it in studio.json)",
+    ].filter(Boolean).join(", ");
+    return {
+      ok: Boolean(chrome && ws && has("ffmpeg")),
+      detail,
+      install: !chrome ? "npx --yes hyperframes@" + ENGINE_VERSIONS.hyperframes + " browser ensure   (or set ONE_STUDIO_CHROME / HYPERFRAMES_BROWSER_PATH to a Chrome binary)" : "Use Node 22+ (nvm install 22) and FFmpeg",
+    };
+  },
   anatomy: () => {
     const dir = findSkill("anatomy");
     return { ok: Boolean(dir), detail: dir ?? "skill not found", install: "npx skills add wheresryan22/anatomy -g -a claude-code   (or git clone https://github.com/wheresryan22/anatomy and set ONE_STUDIO_ANATOMY)" };
@@ -86,6 +103,7 @@ export function neededTools(project) {
     const e = sceneEngine(s, project.studio);
     if (e === "lemo") need.add("lemo");
     if (e === "remotion") need.add("remotion");
+    if (s.type === "screen") need.add("capture");
   }
   return [...need];
 }
@@ -95,7 +113,7 @@ if (isMain(import.meta.url)) {
     const args = parseArgs(process.argv.slice(2), { flags: ["json", "help"], options: ["tool"] });
     const dir = args._[0];
     if (args.help || (!dir && !args.tool)) {
-      console.log("usage: check-external.mjs <project-dir> | --tool anatomy|lemo|remotion|hyperframes|ffmpeg [<project-dir>]");
+      console.log("usage: check-external.mjs <project-dir> | --tool anatomy|lemo|remotion|hyperframes|ffmpeg|capture [<project-dir>]");
       process.exit(args.help ? 0 : 1);
     }
     const project = dir ? loadProject(dir) : null;

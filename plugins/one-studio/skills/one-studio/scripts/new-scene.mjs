@@ -3,7 +3,7 @@
 // Existing files are kept unless --force. Then edit content/timeline; never restyle with literal colours.
 //   node new-scene.mjs <project-dir> <scene-id|--all> [--force]
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { TEMPLATE_DIR, isMain, loadProject, parseArgs, sceneEngine } from "./lib/project.mjs";
 import { buildIndex, effectiveDuration, renderSceneTemplate, sceneFile } from "./lib/scenes.mjs";
 
@@ -24,6 +24,7 @@ export function newScenes(dir, ids, { force = false } = {}) {
     }
     if (engine === "remotion") throw new Error(`scene ${scene.id} renders with Remotion: use new-remotion.mjs`);
     const path = sceneFile(project, scene.id);
+    if (scene.world) ensureWorldFile(project, scene.world);
     if (existsSync(path) && !force) {
       out.push({ id: scene.id, path, created: false });
       continue;
@@ -33,6 +34,14 @@ export function newScenes(dir, ids, { force = false } = {}) {
   }
   buildIndex(project);
   return out;
+}
+
+// worlds/<name>.html is shared by every scene of that world: start it from the basic template, never overwrite it.
+function ensureWorldFile(project, name) {
+  const file = resolve(project.root, project.storyboard.worlds?.[name]?.file ?? `worlds/${name}.html`);
+  if (existsSync(file)) return;
+  mkdirSync(dirname(file), { recursive: true });
+  copyFileSync(join(TEMPLATE_DIR, "worlds", "basic.html"), file);
 }
 
 // Character scene: a lemo-opuscar page folder scenes/<id>/ with its own copy of the brand tokens

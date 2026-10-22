@@ -1,0 +1,302 @@
+{
+  "version": 1,
+  "worlds": {
+    "gps": {
+      "file": "worlds/gps.html",
+      "size": {
+        "w": 4266,
+        "h": 2400
+      }
+    }
+  },
+  "motifs": [
+    {
+      "id": "tick",
+      "selector": "#tick",
+      "note": "vòng sáng tích tắc: toả ra ở vệ tinh, lao xuống điện thoại, rồi lặp ở cả bốn vệ tinh"
+    }
+  ],
+  "scenes": [
+    {
+      "id": "s01",
+      "title": "Ngã tư",
+      "type": "diagram",
+      "mode": "world-camera",
+      "duration": 8,
+      "goal": "Hook: nêu hiểu lầm, hứa 'nó chỉ nghe'",
+      "visual": "Người đứng ở ngã tư giơ điện thoại, chấm xanh hiện; camera kéo lùi ra bầu trời có bốn vệ tinh",
+      "world": "gps",
+      "camera": {
+        "from": "street",
+        "to": {
+          "x": 2133,
+          "y": 1200,
+          "zoom": 1
+        },
+        "move": "push",
+        "at": 3.7
+      },
+      "exit_state": {
+        "screen": "fixed"
+      },
+      "lines": [
+        {
+          "id": "s01-1",
+          "text": "Bạn mở bản đồ ở ngã tư, và chấm xanh hiện ra.",
+          "kind": "narration"
+        },
+        {
+          "id": "s01-2",
+          "text": "Nhiều người tưởng nó hỏi vệ tinh, nhưng nó chỉ nghe.",
+          "kind": "narration"
+        }
+      ],
+      "sfx": [
+        {
+          "name": "pop",
+          "at": 2.7,
+          "line": "s01-1"
+        }
+      ],
+      "transition": {
+        "kind": "cut",
+        "duration": 0
+      }
+    },
+    {
+      "id": "s02",
+      "title": "Vệ tinh đọc giờ",
+      "type": "diagram",
+      "mode": "exploded-cutaway",
+      "duration": 9.5,
+      "goal": "Vệ tinh chỉ phát giờ của đồng hồ nguyên tử",
+      "visual": "Vệ tinh số hai tách vỏ, lộ đồng hồ nguyên tử; vòng sáng tích tắc toả ra",
+      "world": "gps",
+      "camera": {
+        "from": {
+          "x": 2133,
+          "y": 1200,
+          "zoom": 1
+        },
+        "to": "sat2",
+        "move": "push",
+        "dur": 3.4
+      },
+      "exit_state": {
+        "screen": "fixed",
+        "sat2": "open",
+        "tick": "at-sat2"
+      },
+      "motif": [
+        "tick"
+      ],
+      "handoff": {
+        "selector": "#tick",
+        "to_scene": "s03"
+      },
+      "lines": [
+        {
+          "id": "s02-1",
+          "text": "Cách bạn chừng 20.000 cây số, vệ tinh liên tục đọc to giờ của nó.",
+          "say": "Cách bạn chừng hai mươi nghìn cây số, vệ tinh liên tục đọc to giờ của nó.",
+          "kind": "fact",
+          "source": [
+            "r1",
+            "r3"
+          ]
+        },
+        {
+          "id": "s02-2",
+          "text": "Mỗi tiếng tích tắc kèm vị trí của nó.",
+          "kind": "fact",
+          "source": "r3"
+        }
+      ],
+      "transition": {
+        "kind": "cut",
+        "duration": 0
+      }
+    },
+    {
+      "id": "s03",
+      "title": "Tiếng tích tắc đi xuống",
+      "type": "diagram",
+      "mode": "match-cut-motif",
+      "duration": 10,
+      "goal": "Độ trễ tín hiệu là thứ điện thoại đo",
+      "visual": "Vòng sáng tích tắc rời vệ tinh, lao xuống điện thoại; '67 ms' hiện bên cạnh",
+      "world": "gps",
+      "camera": {
+        "from": "sat2",
+        "to": "street",
+        "move": "follow",
+        "dur": 6
+      },
+      "exit_state": {
+        "screen": "fixed",
+        "sat2": "idle",
+        "tick": "at-phone",
+        "trail": "on"
+      },
+      "motif": [
+        "tick"
+      ],
+      "lines": [
+        {
+          "id": "s03-1",
+          "text": "Tiếng tích tắc lao xuống, mất chừng 67 phần nghìn giây.",
+          "kind": "fact",
+          "source": [
+            "r4",
+            "r7"
+          ],
+          "say": "Tiếng tích tắc lao xuống, mất chừng sáu mươi bảy phần nghìn giây."
+        },
+        {
+          "id": "s03-2",
+          "text": "Điện thoại chỉ đo nó đến trễ bao lâu.",
+          "kind": "narration"
+        }
+      ],
+      "transition": {
+        "kind": "cut",
+        "duration": 0
+      }
+    },
+    {
+      "id": "s04",
+      "title": "Ba vòng tròn",
+      "type": "diagram",
+      "mode": "world-camera",
+      "duration": 8.5,
+      "goal": "Độ trễ thành khoảng cách, khoảng cách thành vòng tròn",
+      "visual": "Ba cung tròn từ ba vệ tinh vẽ dần và gặp nhau tại ngã tư, chấm xanh sáng",
+      "world": "gps",
+      "camera": {
+        "from": "street",
+        "to": "circles",
+        "move": "push",
+        "dur": 4
+      },
+      "exit_state": {
+        "screen": "fixed",
+        "tick": "at-phone",
+        "trail": "on",
+        "arcs3": "on",
+        "fix": "on"
+      },
+      "motif": [
+        "tick"
+      ],
+      "lines": [
+        {
+          "id": "s04-1",
+          "text": "Trễ càng lâu, vệ tinh càng xa: mỗi vệ tinh vẽ một vòng tròn.",
+          "kind": "fact",
+          "source": "r4"
+        },
+        {
+          "id": "s04-2",
+          "text": "Các vòng cắt nhau đúng chỗ bạn đứng.",
+          "kind": "narration"
+        }
+      ],
+      "transition": {
+        "kind": "cut",
+        "duration": 0
+      }
+    },
+    {
+      "id": "s05",
+      "title": "Vệ tinh thứ tư",
+      "type": "diagram",
+      "mode": "world-camera",
+      "duration": 10,
+      "goal": "Vệ tinh thứ tư sửa đồng hồ rẻ của điện thoại",
+      "visual": "Ba cung lệch thành tam giác nhỏ, '1 ns = 30 cm'; cung thứ tư kéo cả bốn về một điểm",
+      "world": "gps",
+      "camera": {
+        "from": "circles",
+        "to": {
+          "x": 2133,
+          "y": 1200,
+          "zoom": 1
+        },
+        "move": "push",
+        "at": 6.9
+      },
+      "exit_state": {
+        "screen": "fixed",
+        "tick": "at-phone",
+        "trail": "on",
+        "arcs3": "on",
+        "fix": "on",
+        "arc4": "on",
+        "sat4": "hl",
+        "beams": "on"
+      },
+      "lines": [
+        {
+          "id": "s05-1",
+          "text": "Đồng hồ điện thoại rẻ, lệch một phần tỷ giây là lệch 30 phân.",
+          "kind": "fact",
+          "source": [
+            "r4",
+            "r5"
+          ],
+          "say": "Đồng hồ điện thoại rẻ, lệch một phần tỷ giây là lệch ba mươi phân."
+        },
+        {
+          "id": "s05-2",
+          "text": "Nên vệ tinh thứ tư chỉ để sửa giờ cho điện thoại.",
+          "kind": "fact",
+          "source": "r4"
+        }
+      ],
+      "transition": {
+        "kind": "cut",
+        "duration": 0
+      }
+    },
+    {
+      "id": "s06",
+      "title": "Cả hệ chạy",
+      "type": "diagram",
+      "mode": "world-camera",
+      "duration": 14,
+      "goal": "Payoff: cả hệ chạy một lượt, chấm xanh đúng ngã tư; giới hạn tương đối",
+      "visual": "Bốn vệ tinh tích tắc, bốn vệt sáng xuống, '+38 µs mỗi ngày', chấm xanh đúng ngã tư",
+      "world": "gps",
+      "camera": {
+        "from": {
+          "x": 2133,
+          "y": 1200,
+          "zoom": 1
+        },
+        "to": {
+          "x": 2133,
+          "y": 1260,
+          "zoom": 1.12
+        },
+        "move": "push"
+      },
+      "motif": [
+        "tick"
+      ],
+      "lines": [
+        {
+          "id": "s06-1",
+          "text": "Không chỉnh giờ theo thuyết tương đối, định vị lệch 10 cây số mỗi ngày.",
+          "kind": "fact",
+          "source": "r6",
+          "say": "Không chỉnh giờ theo thuyết tương đối, định vị lệch mười cây số mỗi ngày."
+        },
+        {
+          "id": "s06-2",
+          "text": "Ý kiến của mình: đẹp nhất là hệ thống im lặng, chỉ có bạn nghe.",
+          "kind": "opinion"
+        }
+      ]
+    }
+  ]
+}

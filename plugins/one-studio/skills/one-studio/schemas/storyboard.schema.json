@@ -22,6 +22,66 @@
       "items": {
         "$ref": "#/$defs/scene"
       }
+    },
+    "worlds": {
+      "type": "object",
+      "description": "Shared canvases in worlds/<name>.html; scenes that name one render as camera moves inside it.",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "file",
+          "size"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "file": {
+            "type": "string"
+          },
+          "size": {
+            "type": "object",
+            "required": [
+              "w",
+              "h"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "w": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "h": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    "motifs": {
+      "type": "array",
+      "description": "Recurring objects that carry across scenes (match cuts, running motif).",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "selector"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
+          "selector": {
+            "type": "string",
+            "minLength": 1
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
     }
   },
   "$defs": {
@@ -34,7 +94,8 @@
         "rive",
         "explainer",
         "character",
-        "3d"
+        "3d",
+        "screen"
       ]
     },
     "engine": {
@@ -75,6 +136,35 @@
         "pause_after": {
           "type": "number",
           "minimum": 0
+        },
+        "kind": {
+          "enum": [
+            "fact",
+            "quote",
+            "opinion",
+            "narration"
+          ]
+        },
+        "source": {
+          "description": "Research item id(s) backing this line.",
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1
+            }
+          ]
+        },
+        "speaker": {
+          "type": "string",
+          "description": "Who said it, for kind=quote."
         }
       }
     },
@@ -210,6 +300,61 @@
             }
           }
         },
+        "screen": {
+          "type": "object",
+          "required": [
+            "flow"
+          ],
+          "additionalProperties": false,
+          "description": "Screen scene: plays a recorded flow (flows/<id>.json, capture-screen.mjs) between two marks.",
+          "properties": {
+            "flow": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9_-]*$"
+            },
+            "from_mark": {
+              "type": "string",
+              "description": "Start at this mark (default: start of the recording)."
+            },
+            "to_mark": {
+              "type": "string",
+              "description": "End at this mark (default: end of the recording)."
+            },
+            "frame": {
+              "enum": [
+                "window",
+                "device",
+                "none"
+              ],
+              "description": "Window chrome around the recording (default window)."
+            },
+            "zoom": {
+              "enum": [
+                "auto",
+                "manual"
+              ],
+              "description": "auto: the camera follows clicks; manual: no zoom unless the scene script adds one."
+            },
+            "cursor": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "size": {
+                  "type": "number",
+                  "minimum": 8,
+                  "maximum": 120,
+                  "description": "Pointer height in scene px at 1080 on the short side."
+                },
+                "smooth": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "description": "0 = raw recorded path, 1 = very soft spring (default 0.5)."
+                }
+              }
+            }
+          }
+        },
         "three": {
           "type": "object",
           "additionalProperties": false,
@@ -229,6 +374,92 @@
               "description": "Needs post-processing (bloom, DOF…): renders with Remotion + R3F."
             }
           }
+        },
+        "mode": {
+          "$ref": "#/$defs/visualMode",
+          "description": "Staging style; see writers-room/visual-modes. Not a scene type."
+        },
+        "world": {
+          "type": "string",
+          "description": "Key of root worlds."
+        },
+        "camera": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "from": {
+              "$ref": "#/$defs/cameraTarget"
+            },
+            "to": {
+              "$ref": "#/$defs/cameraTarget"
+            },
+            "move": {
+              "enum": [
+                "cut",
+                "push",
+                "fly",
+                "orbit",
+                "follow"
+              ]
+            },
+            "ease": {
+              "type": "string"
+            },
+            "at": {
+              "type": "number",
+              "minimum": 0
+            },
+            "dur": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "exit_state": {
+          "type": "object",
+          "description": "World element id to state name at the end of the scene.",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "enter_state": {
+          "type": "object",
+          "description": "World element id to state name at the start of the scene. Defaults to the exit_state of the previous scene in the same world.",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "handoff": {
+          "type": "object",
+          "required": [
+            "selector",
+            "to_scene"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "selector": {
+              "type": "string",
+              "minLength": 1
+            },
+            "to_scene": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]*$"
+            }
+          }
+        },
+        "motion": {
+          "enum": [
+            "smooth",
+            "stepped-12"
+          ]
+        },
+        "motif": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
+          "description": "Ids from root motifs shown in this scene."
         }
       }
     },
@@ -285,6 +516,48 @@
           "description": "dB, default 0."
         }
       }
+    },
+    "visualMode": {
+      "enum": [
+        "world-camera",
+        "match-cut-motif",
+        "screen-cinema",
+        "desk-collage",
+        "exploded-cutaway",
+        "kinetic-type",
+        "split-compare",
+        "archive-documents",
+        "data-story-motion"
+      ]
+    },
+    "cameraTarget": {
+      "description": "A place id in the world, or a free position.",
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "object",
+          "required": [
+            "x",
+            "y"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            },
+            "zoom": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        }
+      ]
     }
   }
 }

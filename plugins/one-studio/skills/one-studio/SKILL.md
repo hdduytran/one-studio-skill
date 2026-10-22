@@ -20,11 +20,11 @@ You are the producer. You move one project through numbered gates, stop at every
 | # | Gate | Do | Exit |
 |---|---|---|---|
 | 0 | Setup | ask once (below) → `init-project.mjs` | project created |
-| 1 | Brief | fill `brief.md` | `--approve brief` |
-| 2 | Script | `script.md`: `## sNN · title`, one bullet = one sentence | **user OK** → `--approve script` |
-| 3 | Storyboard | `storyboard.json` (`schemas/storyboard.schema.json`) | **user OK** → `--approve storyboard` |
+| 1 | Brief | read `../writers-room/SKILL.md`; fill `brief.md` incl. Story core; record `studio.json → story` | `--approve brief` |
+| 2 | Script | writers-room process → `script.md` (two columns, `script-lint.mjs`, read-aloud); bullet = one sentence | **user OK** → `--approve script` |
+| 3 | Storyboard | `storyboard.json` (`schemas/storyboard.schema.json`); visual modes from writers-room `visual-modes/` | **user OK** → `--approve storyboard` |
 | 4 | Estimate | `status.mjs --estimate`, show the table | **user accepts** → `--approve estimate` |
-| 5 | Keyframes | `prepare-project` → `new-scene` → write scenes → `keyframe-stills` → show `review/sheet.jpg` (+ `sheet-<ratio>.jpg` per export) | **user OK per scene** → `--approve-scenes <ids>` → `--approve keyframes` |
+| 5 | Keyframes | `prepare-project` → `new-scene` → write scenes → `keyframe-stills` → show `review/sheet.jpg` (+ `sheet-<ratio>.jpg` per export); same-world pairs: `seam-check.mjs`, show `review/seams.jpg` | **user OK per scene** → `--approve-scenes <ids>` → `--approve keyframes` |
 | 6 | Build | `render-changed-scenes --preview` (only approved, changed scenes) | `--approve build` |
 | 7 | Audio | music pick (`make-music --samples` → `audio-picker` → `--use`), SFX cues, `build-audio` (asks before TTS), fits lengths + `data-line` reveals, captions | `--approve audio` |
 | 8 | Preview | `render-changed-scenes --preview` + `concat-and-mix --preview` | **user OK** → `--approve preview` |
@@ -56,7 +56,10 @@ Read a reference only when you are about to build a scene of that type; read `re
 | lottie, rive | HyperFrames | `scene-types/lottie-rive.md` | – (Rive unverified) |
 | explainer | HyperFrames + anatomy SVG | `scene-types/explainer-anatomy.md` | anatomy skill |
 | character | lemo-opuscar clip | `scene-types/character-lemo.md` | lemo-opuscar; ONE `styles/<slug>/STYLE.md` |
+| screen | HyperFrames + recorded flow | `scene-types/screen.md` | Chrome + FFmpeg; user consent (`services.capture`) |
 | 3d | three.js in HyperFrames; Remotion if `three.physics`/`three.postfx` | `scene-types/3d.md` | remotion (only for physics/post-fx) |
+
+A scene's `mode` (storyboard) means `../writers-room/visual-modes/<mode>.md`: read it before writing that scene. Scenes of one `world` use `worlds/<id>.html` with `S.camera` / `S.state` / `S.lines`.
 
 Engines and traps: `references/engine-selection.md`. Rendering, cache, brand changes: `references/render-ffmpeg.md`. Audio (voices, music beds, SFX cues, captions, howler.js vs FFmpeg): `references/audio-tts.md`. Series & publishing: `references/series-publish.md`.
 
@@ -66,6 +69,7 @@ Engines and traps: `references/engine-selection.md`. Rendering, cache, brand cha
 - One scene = one file = one clip. Editing a scene re-reads only that scene's reference and re-renders only that scene.
 - Look at contact sheets yourself before showing them; fix obvious faults first.
 - Never call TTS, download or install anything without consent (`studio.json → services`). Music beds and SFX are synthesised locally (no consent needed); voice samples are TTS calls (ask). Keep chat output to tables and paths.
+- Screen capture (`capture-screen.mjs`) only after the user gives the URL and consent (`services.capture`); never type passwords, use only a storage state the user supplies. News research via web search only when the user asks and `services.web: true`.
 
 ## Consistency
 
@@ -77,6 +81,6 @@ Engines and traps: `references/engine-selection.md`. Rendering, cache, brand cha
 
 ## Files in a project
 
-`brief.md` · `script.md` · `storyboard.json` · `studio.json` (state) · `brand/` or `../series/<name>/brand/` · `assets/` (`music/`, `sfx/`, `audio-cues.js`) · `scenes/<id>.html` (or `scenes/<id>/` for lemo, `remotion/` for R3F) · `audio/` · `captions.srt` · `review/sheet*.jpg`, `review/audio-picker.html`, `review/voices/`, `review/music/`, `review/presets.jpg` · `out/scenes/<id>-<hash>.mp4` · `out/<name>.mp4` · `out/manifest.json`
+`brief.md` · `research.md` (news/fact videos) · `script.md` · `storyboard.json` · `studio.json` (state) · `brand/` or `../series/<name>/brand/` · `assets/` (`music/`, `sfx/`, `audio-cues.js`) · `scenes/<id>.html` (or `scenes/<id>/` for lemo, `remotion/` for R3F) · `audio/` · `flows/<id>.json` + `capture/<id>/` (screen scenes) · `captions.srt` · `review/sheet*.jpg`, `review/audio-picker.html`, `review/voices/`, `review/music/`, `review/presets.jpg` · `out/scenes/<id>-<hash>.mp4` · `out/<name>.mp4` · `out/manifest.json`
 
 Check any time: `node "$S/scripts/validate.mjs" <dir>`, `node "$S/scripts/check-external.mjs" <dir>` (also reports missing libass / drawtext; both have fallbacks).

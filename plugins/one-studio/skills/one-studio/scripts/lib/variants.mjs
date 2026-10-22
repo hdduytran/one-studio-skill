@@ -1,7 +1,7 @@
 // Other aspect ratios of a finished video: per-scene variant clips rendered from the same sources.
 import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { ASPECTS, sha256 } from "./project.mjs";
+import { ASPECTS, linkSharedDirs, sha256 } from "./project.mjs";
 import { sceneHash } from "./hash.mjs";
 import { run } from "./ffmpeg.mjs";
 
@@ -24,6 +24,7 @@ export function variantRoot(project, aspect) {
   rmSync(root, { recursive: true, force: true });
   mkdirSync(join(root, "scenes"), { recursive: true });
   symlinkSync(join(project.root, "assets"), join(root, "assets"), "dir");
+  linkSharedDirs(project.root, root);
   const hfJson = join(project.root, "hyperframes.json");
   if (existsSync(hfJson)) writeFileSync(join(root, "hyperframes.json"), readFileSync(hfJson));
   const from = { width: project.studio.format.width, height: project.studio.format.height };

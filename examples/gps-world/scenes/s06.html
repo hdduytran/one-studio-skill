@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1920, height=1080" />
+<!-- one-studio scene s06 (diagram). Edit content and the timeline only; styles come from brand tokens. -->
+<link rel="stylesheet" href="../assets/brand.css" />
+<link rel="stylesheet" href="../assets/os.css" />
+<script src="../assets/vendor/gsap.min.js"></script>
+<script src="../assets/camera.js"></script>
+<script src="../assets/brand.js"></script>
+<!-- studio preview of storyboard SFX cues (never in renders; the final mix is FFmpeg's) -->
+<script src="../assets/vendor/howler.core.min.js"></script>
+<script src="../assets/audio-cues.js"></script>
+<script src="../assets/os.js"></script>
+</head>
+<body>
+<div id="root" class="os-scene" data-composition-id="s06" data-start="0" data-duration="14" data-width="1920" data-height="1080"
+     data-transition-in="cut" data-transition-out="fade" data-transition-duration="0.4"
+     style="--w: 1920px; --h: 1080px">
+  <link rel="x-world" href="../worlds/gps.html" />
+  <div class="os-world" data-world="gps" data-world-w="4266" data-world-h="2400" data-camera="{&quot;from&quot;:{&quot;x&quot;:2133,&quot;y&quot;:1200,&quot;zoom&quot;:1},&quot;to&quot;:{&quot;x&quot;:2133,&quot;y&quot;:1260,&quot;zoom&quot;:1.12},&quot;move&quot;:&quot;push&quot;}" data-enter-state="{&quot;screen&quot;:&quot;fixed&quot;,&quot;tick&quot;:&quot;at-phone&quot;,&quot;trail&quot;:&quot;on&quot;,&quot;arcs3&quot;:&quot;on&quot;,&quot;fix&quot;:&quot;on&quot;,&quot;arc4&quot;:&quot;on&quot;,&quot;sat4&quot;:&quot;hl&quot;,&quot;beams&quot;:&quot;on&quot;}"></div>
+  <div class="os-frame clip" data-start="0" data-duration="14" data-track-index="0" style="justify-content: flex-start; align-items: flex-start; padding-top: calc(260 * var(--u))">
+    <div class="os-card rel" style="text-align: center">
+      <div class="os-h2 os-accent">+38 µs mỗi ngày</div>
+      <div class="os-small os-muted">đồng hồ vệ tinh nhanh hơn dưới đất</div>
+    </div>
+  </div>
+</div>
+<script>
+  const S = OS.scene("s06");
+  const EX = 110; // how far the satellite shell opens (matches --ex of the open state)
+  const REST = 60; // resting hand angle in degrees (a full turn of steps returns to it)
+  const SAT = { 1: [810, 540], 2: [1640, 310], 3: [2640, 340], 4: [3500, 600] };
+  const PHONE = [2210, 1430];
+  const WHOLE = { x: 2133, y: 1200, zoom: 1 };
+  const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+  const lerp = (a, b, u) => a + (b - a) * u;
+  const smooth = (u) => u * u * (3 - 2 * u);
+  const el = (sel) => S.q(sel)[0];
+  // The signal pulse: its place is the --tx / --ty pair; pop sets its look.
+  const setTick = (id, x, y, scale, alpha) => {
+    const g = el("#" + id), body = g.firstElementChild;
+    g.style.setProperty("--tx", x);
+    g.style.setProperty("--ty", y);
+    body.style.opacity = alpha;
+    body.style.transform = "scale(" + scale + ")";
+  };
+  const setHand = (sel, deg, len) => {
+    const h = el(sel), a = (deg * Math.PI) / 180;
+    h.setAttribute("x2", (len * Math.sin(a)).toFixed(2));
+    h.setAttribute("y2", (-len * Math.cos(a)).toFixed(2));
+  };
+
+  // The whole system runs once at its own pace: four clocks tick, four pulses fall to the same phone, the dot stays on the crossroads.
+  S.camera(WHOLE, { x: 2133, y: 1260, zoom: 1.12 }, { move: "push", ease: "power1.inOut" });
+  S.enter(".rel", { at: S.line("s06-1", 0) + 1.0, kind: "up" });
+  S.tl.to("#sat4 .g-halo", { opacity: 0, duration: 0.6 }, 3);
+  const movers = [[1, "tickA", 0], [2, "tickB", 0.35], [3, "tickC", 0.7], [4, "tickD", 1.05]];
+  const start = 0.6, period = 2.4, loops = 3;
+  const dist = (n) => Math.hypot(SAT[n][0] - PHONE[0], SAT[n][1] - PHONE[1]);
+  const flight = (n) => 0.8 + dist(n) / 2200;
+  const arrivals = [];
+  movers.forEach(([n, , off]) => { for (let k = 0; k < loops; k++) arrivals.push(start + off + k * period + flight(n)); });
+  const halo = el("#fix .fx-halo");
+  S.drive((t) => {
+    movers.forEach(([n, id, off]) => {
+      const k = Math.floor((t - start - off) / period);
+      const local = t - start - off - k * period;
+      if (k < 0 || k >= loops || local > flight(n)) return setTick(id, SAT[n][0], SAT[n][1], 0.4, 0);
+      const u = smooth(local / flight(n));
+      setTick(id, lerp(SAT[n][0], PHONE[0], u), lerp(SAT[n][1], PHONE[1], u), 0.4 + 0.6 * clamp(local / 0.25), clamp(local / 0.2));
+    });
+    const ping = arrivals.reduce((m, a) => (t >= a && t < a + 0.45 ? Math.max(m, 1 - (t - a) / 0.45) : m), 0);
+    setTick("tick", PHONE[0], PHONE[1], 1 + 0.4 * ping, 1);
+    const step = Math.floor(clamp((t - 0.3) / 0.25, 0, 40));
+    [1, 2, 3, 4].forEach((n) => setHand("#sat" + n + " .g-bhand", REST + 30 * step, 15));
+    const tail = clamp((t - 10.5) / 3);
+    const beat = 0.12 * Math.sin(tail * 2 * Math.PI * 2) * Math.sin(Math.PI * tail);
+    halo.setAttribute("rx", 170 * (1 + beat));
+    halo.setAttribute("ry", 54 * (1 + beat));
+  }, { at: 0 });
+  S.done();
+</script>
+</body>
+</html>

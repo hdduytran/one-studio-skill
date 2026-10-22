@@ -1,0 +1,16 @@
+[
+  { "phrase": "bạn có bao giờ tự hỏi", "severity": "error", "replace": "Mở bằng một cảnh cụ thể hoặc một con số lạ, không bằng câu hỏi chung." },
+  { "phrase": "hãy cùng tìm hiểu", "severity": "error", "replace": "Vào thẳng chuyện: câu đầu đã là nội dung." },
+  { "phrase": "hãy cùng khám phá", "severity": "error", "replace": "Vào thẳng chuyện: câu đầu đã là nội dung." },
+  { "phrase": "trong thời đại công nghệ 4.0", "severity": "error", "replace": "Nêu mốc cụ thể (năm, sự kiện) thay cho 'thời đại'." },
+  { "phrase": "trong thời đại ngày nay", "severity": "error", "replace": "Nêu mốc cụ thể thay cho 'thời đại'." },
+  { "regex": "không chỉ\\b[^.!?]{0,60}\\bmà còn", "severity": "warning", "replace": "Tách thành hai câu, giữ ý quan trọng hơn." },
+  { "regex": "đóng vai trò (vô cùng |rất )?quan trọng", "severity": "error", "replace": "Nói nó làm gì, hỏng thì mất gì." },
+  { "phrase": "giải pháp toàn diện", "severity": "error", "replace": "Kể giải quyết đúng việc nào." },
+  { "phrase": "nâng tầm", "severity": "warning", "replace": "Nói thay đổi bao nhiêu, ở đâu." },
+  { "phrase": "kỷ nguyên mới", "severity": "error", "replace": "Bỏ, hoặc nêu thay đổi cụ thể." },
+  { "regex": "^tóm lại\\b", "severity": "warning", "replace": "Kết bằng một hình ảnh hoặc việc người xem làm tiếp." },
+  { "phrase": "không thể phủ nhận", "severity": "warning", "replace": "Nói thẳng điều đó." },
+  { "phrase": "một cách toàn diện", "severity": "warning", "replace": "Nói rõ gồm những phần nào." },
+  { "phrase": "trong video này", "severity": "warning", "replace": "Vào thẳng nội dung, đừng giới thiệu video." }
+]

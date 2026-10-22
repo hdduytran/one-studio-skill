@@ -168,8 +168,45 @@
     "services": {
       "description": "External services the user allowed at gate 0. Anything not true must be asked before use.",
       "type": "object",
+      "properties": {
+        "web": {
+          "type": "boolean",
+          "description": "Allow web search for research (news, facts)."
+        },
+        "capture": {
+          "type": "boolean",
+          "description": "Allow recording the screen of user-supplied URLs."
+        }
+      },
       "additionalProperties": {
         "type": "boolean"
+      }
+    },
+    "story": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Writers-room choices recorded at gates 1-3 so later gates and sessions do not re-decide them.",
+      "properties": {
+        "playbook": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "format": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "tone": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "modes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
+          "uniqueItems": true
+        }
       }
     },
     "gates": {
