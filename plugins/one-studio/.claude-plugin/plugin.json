@@ -1,7 +1,7 @@
 {
   "name": "one-studio",
-  "version": "0.5.0",
-  "description": "Guided motion-video pipeline with a writers-room (playbooks, script lint), continuous camera worlds, screen capture and sourced news: brief → script → storyboard → keyframe review → per-scene incremental render → TTS voice-over, offline music beds & SFX, caption choice → multi-ratio publish. HyperFrames for 2D/3D, Remotion for physics, anatomy explainers, lemo-opuscar characters.",
+  "version": "0.6.0",
+  "description": "Guided motion-video pipeline with a writers-room (playbooks, script lint), continuous camera worlds, screen capture and sourced news: brief → script → storyboard → keyframe review → per-scene incremental render → TTS voice-over, offline music beds & SFX, caption choice → multi-ratio publish; a user library of looks, mockup kits and playbooks shared across projects. HyperFrames for 2D/3D, Remotion for physics, anatomy explainers, lemo-opuscar characters.",
   "author": {
     "name": "hdduytran",
     "url": "https://github.com/hdduytran"
