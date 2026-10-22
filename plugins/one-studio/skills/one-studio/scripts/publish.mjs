@@ -123,6 +123,20 @@ export function citedSources(project) {
   });
 }
 
+// sources.txt for the description box: one line per source, so research rows that share a URL (one article
+// quoted for several facts) are listed once. Rows without a URL are told apart by their name.
+export function sourcesText(sources, language) {
+  const seen = new Set();
+  const lines = [];
+  for (const x of sources) {
+    const key = x.url || x.name;
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    lines.push(`- ${[x.name, x.url, x.published && `(${x.published})`].filter(Boolean).join(" ")}`);
+  }
+  return `${language === "vi" ? "Nguồn" : "Sources"}:\n${lines.join("\n")}\n`;
+}
+
 export function publish(dir, { ratios = null, thumb = true, title = null, subtitle = null, thumbFrame = null, log = () => {} } = {}) {
   const project = loadProject(dir);
   const renderGate = GATES.find((g) => g.id === "render");
@@ -197,8 +211,7 @@ export function publish(dir, { ratios = null, thumb = true, title = null, subtit
   const sources = citedSources(project);
   if (sources.length) {
     manifest.sources = sources;
-    const label = project.studio.meta.language === "vi" ? "Nguồn" : "Sources";
-    writeFileSync(join(outDir, "sources.txt"), `${label}:\n${sources.map((x) => `- ${[x.name, x.url, x.published && `(${x.published})`].filter(Boolean).join(" ")}`).join("\n")}\n`);
+    writeFileSync(join(outDir, "sources.txt"), sourcesText(sources, project.studio.meta.language));
   }
   writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
   project.studio.outputs ??= {};

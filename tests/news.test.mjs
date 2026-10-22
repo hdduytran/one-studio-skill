@@ -8,7 +8,7 @@ import { run, scene, tmp, writeJson } from "./helpers.mjs";
 import { parseResearch, sourceIds } from "../plugins/one-studio/skills/one-studio/scripts/lib/research.mjs";
 import { lintText } from "../plugins/one-studio/skills/one-studio/scripts/script-lint.mjs";
 import { lineLabel, writeLineTimes } from "../plugins/one-studio/skills/one-studio/scripts/lib/scenes.mjs";
-import { citedSources } from "../plugins/one-studio/skills/one-studio/scripts/publish.mjs";
+import { citedSources, sourcesText } from "../plugins/one-studio/skills/one-studio/scripts/publish.mjs";
 import { loadProject } from "../plugins/one-studio/skills/one-studio/scripts/lib/project.mjs";
 import { brandToCss } from "../plugins/one-studio/skills/one-studio/scripts/brand-to-css.mjs";
 
@@ -127,3 +127,10 @@ test("an opinion line shows its chip in the rendered still", { skip: !chrome && 
 function walk(d) {
   return readdirSync(d).flatMap((n) => (statSync(join(d, n)).isDirectory() ? walk(join(d, n)) : [join(d, n)]));
 }
+
+test("sources.txt lists each URL once, even when several research rows quote the same article", () => {
+  const a = { name: "Anthropic, bài công bố", url: "https://claude.com/a", published: "2026-10-21" };
+  const b = { name: "Anthropic, trang sản phẩm", url: "https://claude.com/b", published: "2026-10-21" };
+  const text = sourcesText([{ id: "r1", ...a }, { id: "r2", ...a }, { id: "r3", ...b }, { id: "r4", ...a }, { id: "r5", name: "Phỏng vấn", url: "" }], "vi");
+  assert.equal(text, "Nguồn:\n- Anthropic, bài công bố https://claude.com/a (2026-10-21)\n- Anthropic, trang sản phẩm https://claude.com/b (2026-10-21)\n- Phỏng vấn\n");
+});
