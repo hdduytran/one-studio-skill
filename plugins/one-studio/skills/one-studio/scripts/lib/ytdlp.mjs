@@ -60,14 +60,15 @@ export function findYtdlp(env = process.env) {
 }
 
 // Argument array (never a shell string). `to` null means "until the end".
-export function buildArgs({ url, dir, from, to }) {
+// subs: false leaves subtitles out (the retry after a subtitle download failed, e.g. HTTP 429 on auto-subs).
+export function buildArgs({ url, dir, from, to, subs = true }) {
   return [
     "--ignore-config",
     "-f", "bv*[height<=720]+ba/b[height<=720]",
     "--download-sections", `*${from}-${to ?? "inf"}`,
     "--no-playlist",
     "--write-info-json",
-    "--write-subs", "--write-auto-subs", "--sub-langs", "vi.*,en.*", "--sub-format", "vtt",
+    ...(subs ? ["--write-subs", "--write-auto-subs", "--sub-langs", "vi.*,en.*", "--sub-format", "vtt"] : []),
     "--no-cookies-from-browser",
     "--no-mtime",
     "-o", `${dir.replace(/%/g, "%%")}/source.%(ext)s`,
@@ -80,17 +81,31 @@ const ERROR_KINDS = [
     "Video cần đăng nhập, riêng tư hoặc giới hạn độ tuổi. Hãy tự tải video rồi chạy lại với đường dẫn file.\nThe video needs a login, is private or age-restricted. Download it yourself and run again with the file path."],
   ["format", /requested format is not available|no video formats found|no formats? (found|available)/i,
     "Không có định dạng video phù hợp (≤720p). Thử tải thủ công rồi dùng đường dẫn file.\nNo suitable video format (≤720p). Download it manually and pass the file."],
-  ["network", /unable to download|urlopen error|timed out|connection (reset|refused|aborted)|temporary failure|name or service|network is unreachable|http error 5\d\d|getaddrinfo/i,
+  ["rate-limit", /http error 429|too many requests|rate[- ]limit/i,
+    "Nền tảng đang giới hạn số lần tải (HTTP 429). Đợi vài phút rồi thử lại, hoặc tự tải video rồi dùng đường dẫn file.\nThe platform is rate-limiting downloads (HTTP 429). Wait a few minutes and retry, or download the video yourself and pass the file."],
+  // Not "unable to download" alone: yt-dlp prints it for subtitle and HTTP 4xx failures too.
+  ["network", /urlopen error|timed out|connection (reset|refused|aborted)|temporary failure|name or service|nodename nor servname|network is unreachable|http error 5\d\d|getaddrinfo/i,
     "Lỗi mạng khi tải. Kiểm tra kết nối rồi thử lại.\nNetwork error while downloading. Check your connection and retry."],
   ["extractor", /unable to extract|extractorerror|unsupported url|report this issue|please report|http error 4\d\d|nsig|signature/i,
     "Bộ trích xuất của yt-dlp không đọc được trang này (thường do nền tảng đổi giao diện). Chạy `yt-dlp -U` để cập nhật rồi thử lại, hoặc tự tải video và dùng đường dẫn file.\nyt-dlp's extractor cannot read this page (platform changes often break it). Run `yt-dlp -U`, or download the video yourself and pass the file."],
 ];
 
-// -> { kind: login|format|network|extractor|other, message }
+// What yt-dlp itself said: its ERROR lines, else the last 3 lines of output.
+export function stderrTail(stderr) {
+  const lines = String(stderr ?? "").trim().split("\n").map((l) => l.trim()).filter(Boolean);
+  const errors = lines.filter((l) => /^ERROR:/.test(l));
+  return (errors.length ? errors.slice(-3) : lines.slice(-3)).join("\n");
+}
+
+// A failure that only concerns subtitles (the video itself may download fine without them).
+export const isSubtitleError = (stderr) => /^ERROR:.*\bsubtitles?\b/im.test(String(stderr ?? ""));
+
+// -> { kind: login|format|rate-limit|network|extractor|other, message } with yt-dlp's own words appended,
+// so a wrong guess of the kind never hides the real cause.
 export function classifyError(stderr) {
   const text = String(stderr ?? "");
-  for (const [kind, re, message] of ERROR_KINDS) if (re.test(text)) return { kind, message };
-  const tail = text.trim().split("\n").slice(-3).join("\n");
+  const tail = stderrTail(text);
+  for (const [kind, re, message] of ERROR_KINDS) if (re.test(text)) return { kind, message: tail ? `${message}\nyt-dlp: ${tail}` : message };
   return { kind: "other", message: `yt-dlp thất bại / yt-dlp failed:\n${tail}` };
 }
 

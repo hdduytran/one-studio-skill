@@ -9,7 +9,7 @@ import { basename, join, resolve } from "node:path";
 import { isMain, loadProject, now, parseArgs, writeJson } from "./lib/project.mjs";
 import { probe, run } from "./lib/ffmpeg.mjs";
 import { ensureGitignore, newSlug, slugify, styleDir, styleRefsDir } from "./lib/style-refs.mjs";
-import { INSTALL_HELP, assertHttpUrl, buildArgs, classifyError, DOWNLOAD_TIMEOUT_MS, filterInfo, findYtdlp, looksLikeUrl, platformOf, resolveRange, stripUserinfo } from "./lib/ytdlp.mjs";
+import { INSTALL_HELP, assertHttpUrl, buildArgs, classifyError, DOWNLOAD_TIMEOUT_MS, filterInfo, findYtdlp, isSubtitleError, looksLikeUrl, platformOf, resolveRange, stderrTail, stripUserinfo } from "./lib/ytdlp.mjs";
 
 export const CONSENT_HELP = 'Downloading a link needs your OK first (the video is only a style reference and is deleted after the style is applied; you are responsible for the platform\'s terms). After the user agrees, set "services": { "download": true } in studio.json and run this again.\nTải video từ link cần được đồng ý trước: video chỉ để tham khảo style và bị xoá sau khi áp dụng. Sau khi người dùng đồng ý, đặt "services": { "download": true } trong studio.json rồi chạy lại.';
 
@@ -28,10 +28,22 @@ function cutLocal(file, dir, { from, to }) {
   return { out, to: from + probe(out).duration };
 }
 
-function downloadLink(bin, url, dir, { from, to }, timeoutMs = DOWNLOAD_TIMEOUT_MS) {
-  const r = spawnSync(bin, buildArgs({ url, dir, from, to }), { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, env: process.env, timeout: timeoutMs, killSignal: "SIGKILL" });
+function ytdlp(bin, args, timeoutMs) {
+  const r = spawnSync(bin, args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, env: process.env, timeout: timeoutMs, killSignal: "SIGKILL" });
   if (r.error?.code === "ETIMEDOUT") throw new Error(`yt-dlp did not finish within ${Math.round(timeoutMs / 1000)}s and was stopped / yt-dlp chạy quá ${Math.round(timeoutMs / 1000)} giây nên đã bị dừng`);
   if (r.error) throw new Error(`Cannot start yt-dlp: ${r.error.message}`);
+  return r;
+}
+
+// Subtitles are a bonus: when only they fail (auto-subs often get HTTP 429), the video is fetched again without them.
+function downloadLink(bin, url, dir, { from, to }, timeoutMs = DOWNLOAD_TIMEOUT_MS) {
+  let r = ytdlp(bin, buildArgs({ url, dir, from, to }), timeoutMs);
+  let warning = null;
+  if (r.status !== 0 && isSubtitleError(r.stderr)) {
+    warning = `subtitles skipped / bỏ qua phụ đề: ${stderrTail(r.stderr).split("\n").pop()}`;
+    for (const f of readdirSync(dir)) rmSync(join(dir, f), { recursive: true, force: true });
+    r = ytdlp(bin, buildArgs({ url, dir, from, to, subs: false }), timeoutMs);
+  }
   if (r.status !== 0) throw new Error(classifyError(r.stderr || r.stdout).message);
   const files = readdirSync(dir);
   const video = files.find((f) => /^source\.(mp4|mkv|webm|mov|m4v)$/i.test(f));
@@ -49,7 +61,7 @@ function downloadLink(bin, url, dir, { from, to }, timeoutMs = DOWNLOAD_TIMEOUT_
   const sub = files.filter((f) => /^source\..+\.vtt$/i.test(f)).sort((a, b) => Number(/\.vi/.test(b)) - Number(/\.vi/.test(a)))[0];
   if (sub) renameSync(join(dir, sub), join(dir, "subs.vtt"));
   for (const f of readdirSync(dir)) if (f !== video && f !== "subs.vtt") rmSync(join(dir, f), { recursive: true, force: true });
-  return { video, info: filterInfo(raw) };
+  return { video, info: filterInfo(raw), warning };
 }
 
 const STALE_STAGING_MS = 60 * 60_000;
@@ -96,12 +108,14 @@ export function fetchStyleSource(project, input, opts = {}) {
   mkdirSync(work, { recursive: true });
   try {
     let info;
+    let warning = null;
     if (isFile) {
       const cut = cutLocal(file, work, range);
       info = { title: basename(file).replace(/\.[^.]+$/, ""), platform: "other", file: "source.mp4", to: cut.to };
     } else {
       const got = downloadLink(bin, url, work, range, opts.downloadTimeoutMs);
       info = { ...got.info, url: stripUserinfo(url), platform: platformOf(got.info.extractor, url), file: got.video };
+      warning = got.warning;
       info.to = range.from + probe(join(work, got.video)).duration;
     }
     const slug = opts.slug ?? newSlug(project, info.title ?? basename(file ?? new URL(url).pathname));
@@ -123,7 +137,7 @@ export function fetchStyleSource(project, input, opts = {}) {
     writeJson(join(work, "info.json"), record);
     const dir = styleDir(project, slug);
     renameSync(work, dir);
-    return { slug, dir, info: record };
+    return { slug, dir, info: record, warning };
   } catch (err) {
     rmSync(work, { recursive: true, force: true });
     throw err;
@@ -138,7 +152,8 @@ if (isMain(import.meta.url)) {
       process.exit(args.help ? 0 : 1);
     }
     const project = loadProject(args._[0]);
-    const { slug, dir, info } = fetchStyleSource(project, args._[1], args);
+    const { slug, dir, info, warning } = fetchStyleSource(project, args._[1], args);
+    if (warning) console.log(`· ${warning}`);
     console.log(`slug: ${slug}\npath: ${join(dir, info.file)}\nduration: ${info.duration}s (range ${info.range.from}-${info.range.to}s)\nsubs: ${info.subs ? "yes (subs.vtt)" : "no"}\nplatform: ${info.platform}`);
   } catch (err) {
     console.error(err.message);

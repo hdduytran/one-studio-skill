@@ -67,7 +67,7 @@ Layers (later wins, field by field): `style.json` (extraction only) < `style.enh
 ## Consent (hard rules)
 
 - A link is downloaded only when `studio.json → services.download` is `true`. Otherwise ask once ("Mình được tải video từ link này về máy để phân tích không?"), then set it. A local file needs no consent.
-- Never install `yt-dlp` or any tool without asking. Never use browser cookies. A link that needs login: stop and tell the user to download it themselves and pass the file.
+- Never install `yt-dlp` or any tool without asking. Never use browser cookies. A link that needs login: stop and tell the user to download it themselves and pass the file. Subtitles are optional: when only they fail (auto-subs often get HTTP 429) the video is fetched again without them and the fetch prints `subtitles skipped`. Every yt-dlp error ends with yt-dlp's own `ERROR:` line; quote it to the user instead of guessing.
 - Default analysed span is the first 90 s; `--from` / `--to` choose another.
 - Approval to apply is the user's explicit OK in chat, after step 4.
 
