@@ -3,7 +3,8 @@
 //   node init-project.mjs <dir> [--title "…"] [--lang vi] [--dimension 2d|3d|mixed]
 //        [--aspect 16:9|9:16|1:1|4:5] [--fps 30] [--duration 45]
 //        [--series <name>] [--series-root <dir>]   (default series root: <dir>/../series)
-//        [--preset <brand preset>] [--captions none|sidecar|mux|burn] [--exports 16:9,9:16]
+//        [--preset <brand preset: plugin or <library>/presets/>] [--captions none|sidecar|mux|burn] [--exports 16:9,9:16]
+//        [--platform shorts,tiktok,reels,youtube,facebook,linkedin]
 //        [--tts-url <base_url>] [--voice <id>] [--probe-tts]
 // With --series, the brand kit lives at <series-root>/<name>/brand/brand.json and is reused
 // as-is when it already exists (no brand questions for later episodes).
@@ -19,9 +20,9 @@ import { PRESET_NAMES, applyPreset } from "./lib/presets.mjs";
 import { PLATFORMS, missingRatios, parsePlatforms, platformWarnings } from "./lib/platforms.mjs";
 import { listVoices } from "./lib/tts.mjs";
 
-const USAGE = `usage: init-project.mjs <dir> [--title "…"] [--lang vi] [--dimension 2d|3d|mixed]
+const usage = (from) => `usage: init-project.mjs <dir> [--title "…"] [--lang vi] [--dimension 2d|3d|mixed]
        [--aspect 16:9|9:16|1:1|4:5] [--fps 30] [--duration 45] [--series <name>] [--series-root <dir>]
-       [--preset ${PRESET_NAMES().join("|")}] [--captions ${CAPTION_MODES.join("|")}] [--exports 16:9,9:16]
+       [--preset ${PRESET_NAMES({ from }).join("|")}] [--captions ${CAPTION_MODES.join("|")}] [--exports 16:9,9:16]
        [--platform ${Object.keys(PLATFORMS).join(",")}]  (shorts/tiktok/reels add a 9:16 export)
        [--tts-url <base_url>] [--voice <id>] [--probe-tts]`;
 
@@ -52,17 +53,17 @@ function defaultTts(lang) {
 }
 
 // A fresh brand kit from the template, optionally starting from a preset.
-function writeNewBrand(brandPath, name, preset) {
+function writeNewBrand(brandPath, name, preset, from) {
   mkdirSync(dirname(brandPath), { recursive: true });
   let brand = JSON.parse(fill(readFileSync(join(TEMPLATE_DIR, "brand.json"), "utf8"), { name }));
-  if (preset) brand = applyPreset(brand, preset);
+  if (preset) brand = applyPreset(brand, preset, { from });
   writeJson(brandPath, brand);
 }
 
 function ensureBrand(root, name, args) {
   if (!args.series) {
     const brandPath = join(root, "brand", "brand.json");
-    writeNewBrand(brandPath, name, args.preset);
+    writeNewBrand(brandPath, name, args.preset, root);
     return { brandPath, reused: false, series: null };
   }
   const series = slug(args.series);
@@ -70,7 +71,7 @@ function ensureBrand(root, name, args) {
   const seriesDir = join(seriesRoot, series);
   const brandPath = join(seriesDir, "brand", "brand.json");
   const reused = existsSync(brandPath);
-  if (!reused) writeNewBrand(brandPath, series, args.preset);
+  if (!reused) writeNewBrand(brandPath, series, args.preset, root);
   const seriesFile = join(seriesDir, "series.json");
   const info = existsSync(seriesFile) ? readJson(seriesFile) : { name: series, brand: "brand/brand.json", episodes: [] };
   const projectRel = relative(seriesDir, root);
@@ -110,7 +111,7 @@ async function main() {
   });
   const dir = args._[0];
   if (args.help || !dir) {
-    console.log(USAGE);
+    console.log(usage(dir ? resolve(dir) : process.cwd()));
     process.exit(dir ? 0 : 1);
   }
   const root = resolve(dir);
@@ -123,7 +124,8 @@ async function main() {
   if (args.dimension && !["2d", "3d", "mixed"].includes(args.dimension)) throw new Error("--dimension must be 2d, 3d or mixed");
   if (args.fps && !(Number.isInteger(Number(args.fps)) && args.fps >= 1 && args.fps <= 120)) throw new Error("--fps must be an integer 1–120");
   if (args.duration && !(Number(args.duration) > 0)) throw new Error("--duration must be a positive number of seconds");
-  if (args.preset && !PRESET_NAMES().includes(args.preset)) throw new Error(`--preset must be one of ${PRESET_NAMES().join(", ")}`);
+  const presetNames = PRESET_NAMES({ from: root });
+  if (args.preset && !presetNames.includes(args.preset)) throw new Error(`--preset must be one of ${presetNames.join(", ")} (your own presets: <library>/presets/, see library.mjs)`);
   if (args.captions && !CAPTION_MODES.includes(args.captions)) throw new Error(`--captions must be one of ${CAPTION_MODES.join(", ")}`);
   const exportsArg = args.exports ? args.exports.split(",").map((r) => r.trim()) : null;
   for (const r of exportsArg ?? []) if (!ASPECTS[r]) throw new Error(`--exports: unknown aspect ${r}`);

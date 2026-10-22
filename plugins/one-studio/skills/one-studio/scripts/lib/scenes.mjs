@@ -5,6 +5,7 @@ import { TEMPLATE_DIR, sceneEngine } from "./project.mjs";
 import { worldNeighbours } from "./visual-refs.mjs";
 import { markSpan, readEvents } from "./flow.mjs";
 import { loadResearch, sourceIds } from "./research.mjs";
+import { componentMarkup, kitComponent, withKit } from "./kits.mjs";
 
 export const sceneFile = (project, id) => join(project.root, "scenes", `${id}.html`);
 
@@ -18,11 +19,15 @@ const TEMPLATE_BY_TYPE = { text: "text", diagram: "diagram", explainer: "explain
 
 export const escapeHtml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
-export function renderSceneTemplate(project, scene) {
+// opts.kit: a kit from lib/kits.mjs, its CSS goes into <style data-kit>; opts.component: one of its components
+// becomes the scene's frame (templates/scenes/kit.html) instead of the type template.
+export function renderSceneTemplate(project, scene, { kit = null, component = null } = {}) {
   if (sceneEngine(scene, project.studio) !== "hyperframes") {
     throw new Error(`scene ${scene.id} uses engine ${sceneEngine(scene, project.studio)}; scaffold it with that engine's template`);
   }
-  const kind = TEMPLATE_BY_TYPE[scene.type];
+  if (component && !kit) throw new Error("--component needs --kit");
+  const part = component ? kitComponent(kit, component) : null;
+  const kind = part ? "kit" : TEMPLATE_BY_TYPE[scene.type];
   const head = readFileSync(join(TEMPLATE_DIR, "scenes", "_head.html"), "utf8");
   const body = readFileSync(join(TEMPLATE_DIR, "scenes", `${kind}.html`), "utf8");
   const brand = project.brand ?? {};
@@ -58,8 +63,12 @@ export function renderSceneTemplate(project, scene) {
     data_scale: wide ? "log" : "linear",
     lottie_name: lottieName,
     extra_head: extraHead,
+    component: part?.name ?? "",
   };
-  const html = (head + body).replace(/\{\{(\w+)\}\}/g, (m, k) => (k in vars ? String(vars[k]) : m));
+  // Component markup is inserted after the {{…}} pass, so braces inside it are left alone.
+  let html = (head + body).replace(/\{\{(\w+)\}\}/g, (m, k) => (k in vars ? String(vars[k]) : m));
+  if (part) html = html.replace("{{component_markup}}", () => componentMarkup(part));
+  if (kit) html = withKit(html, kit);
   return scene.world ? withWorld(html, project, scene, near) : html;
 }
 
