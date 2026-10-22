@@ -176,6 +176,10 @@
         "capture": {
           "type": "boolean",
           "description": "Allow recording the screen of user-supplied URLs."
+        },
+        "download": {
+          "type": "boolean",
+          "description": "Allow downloading a reference video from a link the user gave (style-extract); never used without it."
         }
       },
       "additionalProperties": {
@@ -206,6 +210,24 @@
             "pattern": "^[a-z0-9][a-z0-9-]*$"
           },
           "uniqueItems": true
+        },
+        "style": {
+          "type": "object",
+          "required": [
+            "slug"
+          ],
+          "additionalProperties": false,
+          "description": "Style taken from a reference video (style-refs/<slug>/style.json) and applied to this project.",
+          "properties": {
+            "slug": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]*$"
+            },
+            "variant": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]*$"
+            }
+          }
         }
       }
     },

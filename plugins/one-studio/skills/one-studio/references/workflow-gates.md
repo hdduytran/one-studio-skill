@@ -14,11 +14,12 @@ Marks printed by status: `✓` done · `→` current · `!` input changed after 
   > 1. Video mới hay tập tiếp theo của series nào?
   > 2. 2D, 3D hay kết hợp? Tỉ lệ khung (16:9, 9:16, 1:1) và độ dài? Có cần xuất thêm tỉ lệ khác không?
   > 3. Giọng đọc tiếng Việt qua ZeroTTS ở `http://localhost:8000` đúng không?
-  > 4. Màu/phông/logo riêng, hay chọn một mẫu: `apple-light`, `apple-keynote`, `neon-terminal`, `synthwave`, `ocean-calm`, `warm-editorial`, `swiss-mono`, `infinity-board`, `default`? (mình có thể dựng bảng so sánh)
+  > 4. Màu/phông/logo riêng, hay chọn một mẫu: `apple-light`, `apple-keynote`, `neon-terminal`, `synthwave`, `ocean-calm`, `warm-editorial`, `swiss-mono`, `infinity-board`, `default`, hoặc lấy style từ một video/link có sẵn? (mình có thể dựng bảng so sánh)
   > 5. Phụ đề: **không** · **chỉ file .srt** · **phụ đề mềm** (bật/tắt được, kèm .srt) · **in cứng vào hình**?
   > 6. Được dùng dịch vụ trả phí / từ xa nào không? (mặc định: không)
 - **Do:** `node "$S/scripts/init-project.mjs" D --title "…" --lang <code> --dimension <2d|3d|mixed> --aspect <ratio> --duration <s> [--exports 16:9,9:16] [--preset <name>] [--captions none|sidecar|mux|burn] [--tts-url <url>] [--probe-tts] [--series <name>] [--series-root <dir>]`.
   - With `--series`, brand lives at `<series-root>/<name>/brand/brand.json` (default series root `D/../series`). If it exists it is reused: **do not ask brand questions**; the captions answer then goes to `studio.json → captions`.
+  - "Lấy style từ video/link" → load `../style-extract/SKILL.md` and follow its steps (fetch needs `services.download`, asked once); its apply step writes `brand.json` and `studio.json → story.style`.
   - Unsure about the look → after scenes exist, `compare-presets.mjs D` renders the same scenes in every preset (`review/presets.jpg`); `--apply <preset>` sets it. Presets `apple-light` and `synthwave` use the glass surface (`brand.json → surface: "glass"`).
   - Write the user's brand answers into `brand.json` (keep `version: 1` for a new kit).
   - Captions answer → `--captions` (mapping in `references/audio-tts.md`). Init warns when FFmpeg has no libass: `burn` becomes `mux`; tell the user.
@@ -115,3 +116,4 @@ Marks printed by status: `✓` done · `→` current · `!` input changed after 
 | Change music / SFX | `make-music.mjs D --use …` / edit `scenes[].sfx[]` | audio (+ storyboard for cues), preview, render, publish — no scene re-renders |
 | Change the voice | `tts-openai-compatible.mjs D --use-voice <id>` | audio (every sentence re-synthesised: ask first) |
 | Change the look to a preset | `compare-presets.mjs D`, then `--apply <preset>` | brand version → every scene (ask first) |
+| Change the look to a style taken from a video | `style-extract` steps (`../style-extract/SKILL.md`), then `style-apply.mjs D <slug>` | brand version → every scene (ask first) |
