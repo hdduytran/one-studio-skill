@@ -1,17 +1,18 @@
 #!/usr/bin/env node
 // Apply an extracted style to the project.
-//   node style-apply.mjs <project-dir> <slug> [--variant v] [--as-preset name] [--keep] [--dry-run]
+//   node style-apply.mjs <project-dir> <slug> [--variant v] [--as-preset name] [--keep] [--dry-run] [--allow-low-contrast]
 //   brand.json        the style's brand patch merged over it (section by section), version +1
 //   studio.json       story.style = {slug, variant?}; story.format / story.tone only when still empty
 //   style-refs/<slug>/hints.json   storyboard / audio / writing hints that gates 3 and 7 read
 //   --as-preset       also saves the look to ${ONE_STUDIO_CACHE}/presets/<name>.json (usable by init-project --preset)
 //   cleanup           source.* and frames/ are deleted unless --keep (or the fetch recorded keep: true)
+//   contrast          text/background pairs under WCAG AA refuse the apply (nothing written) unless --allow-low-contrast
 // The script never asks anything: SKILL.md has Claude confirm first, and a version bump re-opens every
 // approved scene (the count is printed). Nothing from style-refs/ is copied into assets/ or out/.
 import { existsSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { isMain, loadProject, parseArgs, readJson, validateKind, writeJson } from "./lib/project.mjs";
-import { mergeBrandPatch, resolveStyle, styleDir } from "./lib/style-refs.mjs";
+import { mergeBrandPatch, resolveStyle, styleContentHash, styleDir } from "./lib/style-refs.mjs";
 import { PRESET_EXTRA_SECTIONS, assertCachePresetName, loadPresets, saveCachePreset } from "./lib/presets.mjs";
 import { sceneHash, sceneSourceExists } from "./lib/hash.mjs";
 import { contrastIssues } from "./lib/style-contrast.mjs";
@@ -56,7 +57,7 @@ function cleanupSource(sd, keep) {
   return gone;
 }
 
-export function applyStyle(dir, slug, { variant, asPreset, keep = false, dryRun = false } = {}) {
+export function applyStyle(dir, slug, { variant, asPreset, keep = false, dryRun = false, allowLowContrast = false } = {}) {
   if (asPreset) assertCachePresetName(asPreset);
   const project = loadProject(dir);
   if (!project.brand) throw new Error("brand.json not found; run init-project.mjs first");
@@ -82,14 +83,20 @@ export function applyStyle(dir, slug, { variant, asPreset, keep = false, dryRun 
   const studioErrors = validateKind("studio", studio);
   if (studioErrors.length) throw new Error(`studio.json would be invalid:\n  ${studioErrors.join("\n  ")}`);
 
+  // Pairs under WCAG AA once applied. Refused unless the user knowingly accepts them: the fix is the contrast
+  // proposal of style-enhance or other colours.
+  const contrast = contrastIssues(brand.colors, brand.captions).map((i) => `${i.token} ${i.ratio.toFixed(1)} < ${i.min}`);
+  if (contrast.length && !allowLowContrast) {
+    throw new Error(`Refused: text/background pairs below WCAG AA (${contrast.join(", ")}). Accept the "contrast" proposal (style-enhance.mjs ${dir} ${slug} lists it; then --accept <its number>) or set other colours with style-set.mjs; pass --allow-low-contrast only if the user insists. Nothing was written.`);
+  }
+
   const info = existsSync(join(sd, "info.json")) ? readJson(join(sd, "info.json")) : {};
   // Scene templates style-enhance generated (lower third, intro, outro, thumbnail), for gate 3 to offer.
   const partsDir = join(sd, "parts");
   const parts = existsSync(partsDir) ? readdirSync(partsDir).filter((f) => f.endsWith(".html")).sort() : [];
-  const hints = { slug, ...(variant && { variant }), storyboard: style.storyboard ?? {}, audio: style.audio ?? {}, writing: style.writing ?? {}, do_not_copy: style.do_not_copy ?? [], ...(parts.length && { parts }) };
+  const hints = { slug, ...(variant && { variant }), applied_hash: styleContentHash(project, slug, variant), storyboard: style.storyboard ?? {}, audio: style.audio ?? {}, writing: style.writing ?? {}, do_not_copy: style.do_not_copy ?? [], ...(parts.length && { parts }) };
   const result = { brandPath: project.brandPath, version: brand.version, ...reapprovalCount(project, brand), filled, series: project.studio.meta.series ?? null, hintsFile: join(sd, "hints.json"), preset: null, removed: [], dryRun,
-    // Pairs under WCAG AA once applied: a warning only, the user may have chosen them (style-enhance proposes the fix).
-    contrast: contrastIssues(brand.colors, brand.captions).map((i) => `${i.token} ${i.ratio.toFixed(1)} < ${i.min}`) };
+    contrast };
   if (dryRun) return result;
 
   if (asPreset) result.preset = saveCachePreset(asPreset, presetEntry(style, sd));
@@ -103,16 +110,16 @@ export function applyStyle(dir, slug, { variant, asPreset, keep = false, dryRun 
 
 if (isMain(import.meta.url)) {
   try {
-    const args = parseArgs(process.argv.slice(2), { flags: ["keep", "dry-run", "help"], options: ["variant", "as-preset"] });
+    const args = parseArgs(process.argv.slice(2), { flags: ["keep", "dry-run", "help", "allow-low-contrast"], options: ["variant", "as-preset"] });
     const [dir, slug] = args._;
     if (args.help || !dir || !slug) {
-      console.log("usage: style-apply.mjs <project-dir> <slug> [--variant v] [--as-preset name] [--keep] [--dry-run]");
+      console.log("usage: style-apply.mjs <project-dir> <slug> [--variant v] [--as-preset name] [--keep] [--dry-run] [--allow-low-contrast]");
       process.exit(dir && slug ? 0 : 1);
     }
-    const r = applyStyle(dir, slug, { variant: args.variant, asPreset: args["as-preset"], keep: args.keep, dryRun: args["dry-run"] });
+    const r = applyStyle(dir, slug, { variant: args.variant, asPreset: args["as-preset"], keep: args.keep, dryRun: args["dry-run"], allowLowContrast: args["allow-low-contrast"] });
     console.log(`${r.dryRun ? "Would apply" : "✓ Applied"} ${slug} → ${r.brandPath} (version ${r.version})${r.series ? ` — shared by series ${r.series}` : ""}`);
     console.log(`  ${r.reapprove} of ${r.scenes} scene(s) need re-approval (${r.approved} approved now); every scene hash changes with the brand version`);
-    if (r.contrast.length) console.log(`  ⚠ below WCAG AA: ${r.contrast.join(", ")} (style-enhance.mjs proposes a fix)`);
+    if (r.contrast.length) console.log(`  ⚠ below WCAG AA, applied because of --allow-low-contrast: ${r.contrast.join(", ")}`);
     if (r.filled.length) console.log(`  story ${r.filled.join(", ")} filled from the style (they were empty)`);
     if (r.dryRun) process.exit(0);
     console.log(`  hints: ${r.hintsFile} (read at gates 3 and 7)`);

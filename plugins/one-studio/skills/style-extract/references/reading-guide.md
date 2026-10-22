@@ -17,7 +17,7 @@ Never guess which tile is which from the picture; count.
 1. Type: heading family class (see font-map.md), weight, caps or lower case, tracking (tight, normal, wide), size relative to the frame.
 2. Layout: where text sits (centre, left third, lower third), grid or free, how much text per frame (words), margins, frame fill (busy or airy).
 3. Surface: `flat` (solid shapes, no blur) or `glass` (frosted, translucent panels, soft shadows).
-4. Captions: present? position (`top`/`middle`/`bottom`), size relative to the frame, background (none, box, outline), colour, highlights word by word.
+4. Captions: present? position (`top`/`middle`/`bottom`), size relative to the frame, background (none, box, outline), colour, highlights word by word (note it in STYLE.md only: the caption renderer has no such field, so it never goes into `style.json`).
 5. Transitions (cuts sheet): hard cut, fade, slide-left/up, wipe, zoom, blur; same everywhere or varied.
 6. Camera and motion: locked, slow push or drift, handheld, fast whip; how things enter (fade, slide, pop, type-on).
 7. Visual mode (<= 3) and format: nearest modes in `writers-room/visual-modes/index.md`; hints in mapping.md.

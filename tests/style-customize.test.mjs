@@ -416,13 +416,22 @@ test("enhance --accept all writes enhance layer, variants and parts; the result 
   assert.ok(!/below WCAG AA/.test(apply.out));
 });
 
-test("style-apply warns about pairs under WCAG AA instead of hiding them", () => {
+test("style-apply refuses pairs under WCAG AA and writes nothing; --allow-low-contrast lets the user override", () => {
   const weak = card("a");
   weak.brand.colors.fg = "#555555";
   const dir = project(weak);
-  const r = run("style-apply.mjs", dir, "a", "--dry-run");
-  assert.match(run("style-apply.mjs", dir, "a").out, /below WCAG AA: colors\.fg/);
-  assert.equal(r.code, 0);
+  const brandFile = join(dir, "brand", "brand.json");
+  const before = [readFileSync(brandFile, "utf8"), readFileSync(join(dir, "studio.json"), "utf8")];
+  for (const extra of [[], ["--dry-run"]]) {
+    const r = run("style-apply.mjs", dir, "a", ...extra);
+    assert.equal(r.code, 1);
+    assert.match(r.err, /Refused: .*below WCAG AA \(colors\.fg .*lists it.*--accept.*style-set\.mjs/s);
+  }
+  assert.deepEqual([readFileSync(brandFile, "utf8"), readFileSync(join(dir, "studio.json"), "utf8")], before, "no writes");
+  assert.ok(!existsSync(join(dir, "style-refs", "a", "hints.json")));
+  const ok = run("style-apply.mjs", dir, "a", "--allow-low-contrast");
+  assert.equal(ok.code, 0, ok.err);
+  assert.match(ok.out, /below WCAG AA, applied because of --allow-low-contrast: colors\.fg/);
 });
 
 // ---- re-extraction keeps the user's choices

@@ -127,14 +127,14 @@ test("--keep and a fetch recorded with keep keep the footage", () => {
 });
 
 test("an approved tone is not overwritten; absent style fields keep the project's values", () => {
-  const dir = project({ a: card("a", { writing: { tone: "playful" }, brand: { colors: { primary: "#112233" } } }) }, { tone: "calm" });
+  const dir = project({ a: card("a", { writing: { tone: "playful" }, brand: { colors: { primary: "#cc3366" } } }) }, { tone: "calm" });
   const before = readJson(join(dir, "brand", "brand.json"));
   apply.applyStyle(dir, "a", {});
   const studio = readJson(join(dir, "studio.json"));
   assert.equal(studio.story.tone, "calm");
   assert.equal(studio.story.format, undefined);
   const after = readJson(join(dir, "brand", "brand.json"));
-  assert.equal(after.colors.primary, "#112233");
+  assert.equal(after.colors.primary, "#cc3366");
   assert.deepEqual([after.colors.bg, after.colors.fg, after.colors.accent], [before.colors.bg, before.colors.fg, before.colors.accent]);
 });
 
@@ -273,4 +273,33 @@ test("check-external does not ask for yt-dlp once the style card exists", async 
   rmSync(join(bare, "style-refs", "a", "source.mp4"), { force: true });
   rmSync(join(bare, "style-refs", "a", "style.json"), { force: true });
   assert.ok(neededTools(loadProject(bare)).includes("yt-dlp"), "a link without footage or card still needs it");
+});
+
+// ---- story.style in status and validate
+
+test("validate: story.style must point to an existing style and variant", () => {
+  const dir = project();
+  apply.applyStyle(dir, "a", {});
+  assert.equal(run("validate.mjs", dir).code, 0);
+  const studio = readJson(join(dir, "studio.json"));
+  writeJson(join(dir, "studio.json"), { ...studio, story: { ...studio.story, style: { slug: "gone" } } });
+  const gone = run("validate.mjs", dir);
+  assert.equal(gone.code, 1);
+  assert.match(gone.out, /story\.style gone: no style-refs\/gone\/style\.json/);
+  writeJson(join(dir, "studio.json"), { ...studio, story: { ...studio.story, style: { slug: "a", variant: "light" } } });
+  assert.match(run("validate.mjs", dir).out, /no variants\/light\.json/);
+});
+
+test("status shows the style in use and flags it with ! once the card changed after apply", () => {
+  const dir = project();
+  assert.ok(!/ style /.test(run("status.mjs", dir).out));
+  apply.applyStyle(dir, "a", {});
+  const line = (out) => out.split("\n").find((l) => / style a/.test(l));
+  assert.equal(line(run("status.mjs", dir).out).trim(), "style a");
+  assert.equal(JSON.parse(run("status.mjs", dir, "--json").out).style.changed, false);
+  assert.equal(run("style-set.mjs", dir, "a", "motion.stagger=0.09").code, 0);
+  assert.match(line(run("status.mjs", dir).out), /^ {2}! style a · the style card changed after it was applied/);
+  assert.equal(JSON.parse(run("status.mjs", dir, "--json").out).style.changed, true);
+  apply.applyStyle(dir, "a", {});
+  assert.equal(JSON.parse(run("status.mjs", dir, "--json").out).style.changed, false);
 });

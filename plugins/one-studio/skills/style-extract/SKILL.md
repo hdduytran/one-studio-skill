@@ -18,7 +18,7 @@ Reads HOW a reference video looks and moves, never WHAT it shows. Output lands i
 | 3 | Read & map | look at the 2 sheets + `metrics.json`, load `references/reading-guide.md` and `references/mapping.md`; `style-draft.mjs D <slug>` | `style.json` (+ `STYLE.md`) |
 | 4 | Compare | `node "$S/scripts/style-compare.mjs" D <slug> [--variant v] [--ratio 9:16] [--offline]` | `review/style-<slug>-compare.jpg`: row 1 reference frames, row 2 title / chart / caption samples in the style, row 3 colour tokens |
 | 5 | Enhance & customize | `style-enhance.mjs D <slug>`, `style-set.mjs D <slug> key=value … [--lock k]`, `style-diff.mjs D <slug>`, `style-editor.mjs D <slug>` (see Step 5) | `style.enhance.json`, `style.custom.json`, `variants/<v>.json`; repeat step 4 after each round |
-| 6 | Apply | `node "$S/scripts/style-apply.mjs" D <slug> [--variant v] [--as-preset name] [--keep] [--dry-run]` | `brand.json` patched with `version` bumped, `studio.json → story.style`, `style-refs/<slug>/hints.json` |
+| 6 | Apply | `node "$S/scripts/style-apply.mjs" D <slug> [--variant v] [--as-preset name] [--keep] [--dry-run] [--allow-low-contrast]` | `brand.json` patched with `version` bumped, `studio.json → story.style`, `style-refs/<slug>/hints.json` |
 
 Merge several references: `node "$S/scripts/style-merge.mjs" D <slug-a> <slug-b> [...] --as <slug>` (numbers: median; colours: only those found in at least 2 sources; other values: majority, a tie leaves the field out and it is listed as open; then run `style-draft.mjs D <slug> --check` and step 4).
 
@@ -36,7 +36,7 @@ Load `references/enhance-rules.md` first. Every command takes `--variant <v>` (e
 4. **Show:** after every change run `style-compare.mjs D <slug> [--variant v]`, show the sheet and `style-diff.mjs D <slug>` (field | extracted | current | layer | lock), ask again. Repeat until the user says OK.
 5. **Close the gate:** `style-apply.mjs` only after the user's explicit OK on the latest sheet (Step 6).
 
-Layers (later wins, field by field): `style.json` (extraction only) < `style.enhance.json` < `style.custom.json` (+ `locked`) < `variants/<v>.json`. Fonts, easing sets and music beds are written whole. Re-running `style-draft --force` or `style-merge` never touches the upper layers.
+Layers (later wins, field by field): `style.json` (extraction only) < `style.enhance.json` < `style.custom.json` (+ `locked`) < `variants/<v>.json`. Fonts, easing sets and music beds are written whole. `status.mjs` shows the style in use and marks it `!` when the effective card changed after the last apply. Re-running `style-draft --force` or `style-merge` never touches the upper layers.
 
 | The user says | Run |
 |---|---|
@@ -59,9 +59,10 @@ Layers (later wins, field by field): `style.json` (extraction only) < `style.enh
 
 1. Only after the latest step 4 sheet (with the variant, if one is used) was shown and the user said an explicit OK in chat. Customizing or enhancing never applies anything by itself.
 2. `style-apply.mjs D <slug> --dry-run` first: it prints how many approved scenes will need re-approval. If that number is above 0, tell the user and ask again ("N cảnh đã duyệt sẽ phải duyệt lại, tiếp tục không?") before the real run. The script itself never asks.
-3. Run it for real. Add `--as-preset <name>` when the user wants to reuse the look in other projects (saved under the plugin cache, listed at gate 0; a plugin preset name is refused). Footage (`source.*`, `frames/`) is deleted unless `--keep` (or the fetch used it).
-4. Then `prepare-project.mjs D` and, for existing scenes, `keyframe-stills.mjs` and re-approval.
-5. `style-refs/<slug>/hints.json` (`storyboard`, `audio`, `writing`, `do_not_copy`) is read at gate 3 (shot length, visual modes, camera, SFX density, intro/outro) and gate 7 (loudness, music bed). `story.format` and `story.tone` are filled from the style only when empty; an approved writers-room choice is never overwritten.
+3. The script refuses (exit 1, nothing written) when text/background pairs fail WCAG AA. Tell the user, offer the `contrast` proposal (`style-enhance.mjs D <slug>` lists it as `[contrast]`; then `--accept <its number>`) or new colours via `style-set`, then run `style-compare` again. Add `--allow-low-contrast` only when the user insists after hearing the reason.
+4. Run it for real. Add `--as-preset <name>` when the user wants to reuse the look in other projects (saved under the plugin cache, listed at gate 0; a plugin preset name is refused). Footage (`source.*`, `frames/`) is deleted unless `--keep` (or the fetch used it).
+5. Then `prepare-project.mjs D` and, for existing scenes, `keyframe-stills.mjs` and re-approval.
+6. `style-refs/<slug>/hints.json` (`applied_hash`, `storyboard`, `audio`, `writing`, `do_not_copy`) is read at gate 3 (shot length, visual modes, camera, SFX density, intro/outro) and gate 7 (loudness, music bed). `story.format` and `story.tone` are filled from the style only when empty; an approved writers-room choice is never overwritten.
 
 ## Consent (hard rules)
 

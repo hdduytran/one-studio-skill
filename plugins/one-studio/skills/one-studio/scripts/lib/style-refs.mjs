@@ -3,6 +3,7 @@
 //                     style.custom.json STYLE.md
 // Callers pass either a project root (string) or a loadProject() result.
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { readJson, validateKind } from "./project.mjs";
 import { effectiveStyle } from "./style-layers.mjs";
@@ -138,4 +139,38 @@ export function styleProjectResults(project) {
       }
       return { file, errors };
     });
+}
+
+// Hash of what an apply takes from the effective style (brand patch, storyboard, writing, audio hints). style-apply
+// stores it in hints.json; status.mjs compares it later to say the card changed after it was applied.
+export function styleContentHash(project, slug, variant) {
+  const style = effectiveStyle(project, slug, variant);
+  const content = Object.fromEntries(["brand", "storyboard", "writing", "audio"].map((k) => [k, style[k] ?? null]));
+  return createHash("sha1").update(JSON.stringify(content)).digest("hex").slice(0, 12);
+}
+
+// studio.json -> story.style must name an existing style-refs/<slug> (and variant). Errors, [] when unset.
+export function storyStyleErrors(project) {
+  const ref = project.studio.story?.style;
+  if (!ref) return [];
+  const label = `studio story.style ${ref.slug}${ref.variant ? ` (variant ${ref.variant})` : ""}`;
+  if (!existsSync(join(styleDir(project, ref.slug), "style.json"))) return [`${label}: no style-refs/${ref.slug}/style.json`];
+  if (ref.variant && !existsSync(join(styleDir(project, ref.slug), "variants", `${ref.variant}.json`))) return [`${label}: no variants/${ref.variant}.json`];
+  return [];
+}
+
+// status.mjs: { slug, variant?, changed, missing } for the style in use; changed = the card differs from what was applied.
+export function styleInUse(project) {
+  const ref = project.studio.story?.style;
+  if (!ref) return null;
+  const out = { slug: ref.slug, ...(ref.variant && { variant: ref.variant }), changed: false, missing: storyStyleErrors(project).length > 0 };
+  const hints = join(styleDir(project, ref.slug), "hints.json");
+  if (out.missing || !existsSync(hints)) return out;
+  try {
+    const applied = readJson(hints).applied_hash;
+    out.changed = Boolean(applied) && applied !== styleContentHash(project, ref.slug, ref.variant);
+  } catch {
+    out.changed = true; // the card no longer resolves: treat as changed so the user looks at it
+  }
+  return out;
 }
