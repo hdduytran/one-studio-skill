@@ -22,6 +22,8 @@ A TTS engine reads what it sees. Write what the mouth says, or set `say` on the 
 | 9:41 | chín giờ bốn mươi mốt | nine forty-one |
 | API, GPS | "ây-pi-ai", "gi-pi-ét": spell the sounds or keep the Latin letters and check the voice | A-P-I, G-P-S |
 
+Brand names built from letters are the common trap in Vietnamese: the engine expands known abbreviations, so "VPBank" comes out as "văn phòng bank" and "GPBank" as "giấy phép bank". Set `say` with the letters spelled ("Vi Pi Bank", "Gi Pi Bank", "Vi Pi Life") on every line that names them; captions keep the brand spelling. Ask the user to listen for names after the first audio build.
+
 Round: "gần bốn mươi phần trăm", "about forty percent". Keep one precise figure per sentence; put the rest on screen. Symbols (%, $, +, /) and digits trigger the lint warning.
 
 ## Rhythm
