@@ -2,9 +2,9 @@
 // Check the tools this project (or a named tool) needs, and print how to install what is missing.
 // Never installs anything: ask the user, then run the printed command.
 //   node check-external.mjs <project-dir>            everything the storyboard needs
-//   node check-external.mjs --tool anatomy|lemo|remotion|hyperframes|ffmpeg|capture [<project-dir>]
+//   node check-external.mjs --tool anatomy|lemo|remotion|hyperframes|ffmpeg|capture|yt-dlp [<project-dir>]
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { ENGINE_VERSIONS, isMain, loadProject, parseArgs, sceneEngine } from "./lib/project.mjs";
@@ -12,6 +12,8 @@ import { lemoLib } from "./lib/engines.mjs";
 import { hasDrawtext, hasLibass } from "./lib/ffmpeg.mjs";
 import { captionSetting } from "./lib/captions.mjs";
 import { cdpAvailable, findChrome } from "./lib/cdp.mjs";
+import { INSTALL_HELP as YTDLP_INSTALL, findYtdlp } from "./lib/ytdlp.mjs";
+import { listStyleSlugs, styleDir } from "./lib/style-refs.mjs";
 
 const has = (bin, args = ["-version"]) => spawnSync(bin, args, { encoding: "utf8" }).status === 0;
 
@@ -68,6 +70,13 @@ export const CHECKS = {
       install: !chrome ? "npx --yes hyperframes@" + ENGINE_VERSIONS.hyperframes + " browser ensure   (or set ONE_STUDIO_CHROME / HYPERFRAMES_BROWSER_PATH to a Chrome binary)" : "Use Node 22+ (nvm install 22) and FFmpeg",
     };
   },
+  // Only needed to fetch a reference link for style-extract; local files never need it.
+  "yt-dlp": (project) => {
+    const bin = findYtdlp();
+    const consent = project ? project.studio.services?.download === true : null;
+    const detail = [bin ? `yt-dlp found (${bin})` : "NO yt-dlp", consent === null ? "" : consent ? "services.download on" : "services.download off (ask the user, then set it in studio.json)"].filter(Boolean).join(", ");
+    return { ok: Boolean(bin), detail, install: `${YTDLP_INSTALL}   (ask the user first; or download the video yourself and pass the file)` };
+  },
   anatomy: () => {
     const dir = findSkill("anatomy");
     return { ok: Boolean(dir), detail: dir ?? "skill not found", install: "npx skills add wheresryan22/anatomy -g -a claude-code   (or git clone https://github.com/wheresryan22/anatomy and set ONE_STUDIO_ANATOMY)" };
@@ -105,6 +114,18 @@ export function neededTools(project) {
     if (e === "remotion") need.add("remotion");
     if (s.type === "screen") need.add("capture");
   }
+  // A style reference recorded from a link whose footage is not on disk yet.
+  for (const slug of listStyleSlugs(project)) {
+    const dir = styleDir(project, slug);
+    if (!existsSync(join(dir, "info.json"))) continue;
+    let info;
+    try {
+      info = JSON.parse(readFileSync(join(dir, "info.json"), "utf8"));
+    } catch {
+      continue;
+    }
+    if (info.url && !readdirSync(dir).some((f) => f.startsWith("source."))) need.add("yt-dlp");
+  }
   return [...need];
 }
 
@@ -113,7 +134,7 @@ if (isMain(import.meta.url)) {
     const args = parseArgs(process.argv.slice(2), { flags: ["json", "help"], options: ["tool"] });
     const dir = args._[0];
     if (args.help || (!dir && !args.tool)) {
-      console.log("usage: check-external.mjs <project-dir> | --tool anatomy|lemo|remotion|hyperframes|ffmpeg|capture [<project-dir>]");
+      console.log("usage: check-external.mjs <project-dir> | --tool anatomy|lemo|remotion|hyperframes|ffmpeg|capture|yt-dlp [<project-dir>]");
       process.exit(args.help ? 0 : 1);
     }
     const project = dir ? loadProject(dir) : null;
