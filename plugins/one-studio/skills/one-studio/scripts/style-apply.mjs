@@ -95,7 +95,7 @@ export function applyStyle(dir, slug, { variant, asPreset, keep = false, dryRun 
 
   // Pairs under WCAG AA once applied. Refused unless the user knowingly accepts them: the fix is the contrast
   // proposal of style-enhance or other colours.
-  const contrast = contrastIssues(brand.colors, brand.captions).map((i) => `${i.token} ${i.ratio.toFixed(1)} < ${i.min}`);
+  const contrast = contrastIssues(brand.colors, brand.captions).map((i) => `${i.token}${i.on === "surface" ? " on surface" : ""} ${i.ratio.toFixed(1)} < ${i.min}`);
   if (contrast.length && !allowLowContrast) {
     throw new Error(`Refused: text/background pairs below WCAG AA (${contrast.join(", ")}). Accept the "contrast" proposal (style-enhance.mjs ${dir} ${slug} lists it; then --accept contrast) or set other colours with style-set.mjs; pass --allow-low-contrast only if the user insists. Nothing was written.`);
   }

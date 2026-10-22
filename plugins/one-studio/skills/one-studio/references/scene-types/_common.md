@@ -13,7 +13,7 @@ Read once per session before writing the first scene; each type file adds only i
 - Sizes in `calc(N * var(--u))` (1 unit = 1 px at 1080 on the short side) so 9:16 / 1:1 exports work.
 - Keep the bottom `--caption-zone` empty (captions are burned there).
 - Ratio-specific layout: a `<style data-ratio="9:16">` (or `"1:1,4:5"`) block in `<head>`, comments inside the CSS. It applies only at that ratio and is hashed only for it, so the main ratio's approval and clip stay valid. The block is removed before any other ratio is rendered, so plain ID rules (even `!important`) are safe; `.os-portrait` / `.os-square` selectors inside it are still allowed.
-- Cards: `.os-card` (or `.os-glass`). With `brand.surface: "glass"` they become frosted glass over a brand-colour wallpaper automatically; never link extra CSS for it.
+- Cards: `.os-card` (or `.os-glass`). With `brand.surface: "glass"` they become frosted glass over a brand-colour wallpaper automatically; never link extra CSS for it. With `colors.surface` (a card fill such as cream on a lavender page) flat cards take `var(--c-surface)`; use that variable for any panel instead of faking it with `color-mix(…, white)`.
 - Deterministic: every tween on the scene timeline via the `OS.scene()` helpers or `S.tl` at an absolute time. No `setTimeout`, `requestAnimationFrame`, `Date.now()`, unseeded `Math.random()`, CSS animations or network fetches.
 - Assets local under `assets/` (run `optimize-assets.mjs` after adding SVG/Lottie). No CDN URLs.
 - Never edit `data-duration`: the audio step owns it.

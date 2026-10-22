@@ -8,14 +8,14 @@ Every proposal is a patch marked `guessed` with note `enhance:<rule>`. Accepted 
 
 | Rule | Fires when | Patch |
 |---|---|---|
-| `contrast` | a text pair of the samples is under WCAG AA: `fg`, `muted` on `bg` under 4.5; `primary`, `secondary`, `accent` (large text, bars) under 3.0; caption text on its box under 4.5 | lightness (OKLCH) of the text-side colour only, hue and chroma kept; the background never moves |
+| `contrast` | a text pair of the samples is under WCAG AA: `fg`, `muted` on `bg` (and on `surface` when the style has one) under 4.5; `primary`, `secondary`, `accent` (large text, bars) under 3.0; caption text on its box under 4.5 | lightness (OKLCH) of the text-side colour only, hue and chroma kept, one value that reads on both bg and surface; the background and the surface never move |
 | `diacritics` | project language is Vietnamese and heading, body or caption font is not a `verified` row of `font-map.md` (and is not the user's own font file) | same-class verified row (geometric -> Be Vietnam Pro, grotesk -> Inter), else Be Vietnam Pro |
 | `token-gaps` | the style lacks `secondary`, `accent` or `muted`, or `secondary`/`accent` is within ΔE2000 8 of an earlier chart colour | secondary: primary hue +40; accent: hue +160 and chroma at least 0.12; muted: near-neutral in the background's hue; each passes contrast |
 | `pace-vs-voice` | the style has a voice and `target_shot_seconds` is under the time to speak 12 words at `words_per_minute` | `target_shot_seconds` = that time, rounded up to 0.1 s |
 | `caption-safe-zone` | 9:16 project (or a `short-vertical` style) and captions sit at the bottom (TikTok / Reels UI covers the bottom 20% and right 12%), or `max_chars` is wider than the middle 76% | `captions.position: middle`; `max_chars` capped to fit |
 | `missing-parts` | no lower third, intro, outro or thumbnail in the brand, the project or `parts/` | scene files in `style-refs/<slug>/parts/` built from brand variables (copy one to `scenes/` and add it to the storyboard); `storyboard.intro` / `outro` text hints |
 | `series-lock` | the project belongs to a series | `locked` in `style.custom.json`: logo, voice, intro, outro, lower third stay the series'; the style only changes colours, fonts, motion, captions |
-| `variants` | no `light` / `dark` variant yet | `variants/light.json` (for a dark style) or `dark.json`: background and text swap lightness, accents kept unless they fail contrast; use with `--variant` |
+| `variants` | no `light` / `dark` variant yet | `variants/light.json` (for a dark style) or `dark.json`: background and text swap lightness (the surface follows: near-white or a raised dark panel), accents kept unless they fail contrast; use with `--variant` |
 
 Thresholds and sizes live in `lib/style-enhance.mjs` and `lib/style-contrast.mjs`; this table is the contract, keep both in step.
 

@@ -53,6 +53,10 @@
         },
         "muted": {
           "$ref": "#/$defs/color"
+        },
+        "surface": {
+          "$ref": "#/$defs/color",
+          "description": "Optional card / panel fill (e.g. cream cards over a lavender background): --c-surface, the .os-card background. Text (fg, muted) must read on it; it is never darkened as if it were text."
         }
       }
     },
