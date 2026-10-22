@@ -27,7 +27,7 @@ export const sampleHtml = (name, opts) => fillScene(readFileSync(join(SAMPLE_DIR
 export function renderScenes(project, brand, scenes, { root, ratio, offline = false, label }) {
   const { width, height } = ASPECTS[ratio];
   const lang = project.studio.meta.language;
-  const { warning } = stageBrand(project, { root, brand, scenes, offline, label });
+  const { warning } = stageBrand(project, { root, brand, scenes, offline, label, aspect: ratio });
   const mini = { root, studio: { format: { width, height, fps: 30 }, meta: { language: lang } }, storyboard: { scenes: scenes.map((s) => ({ id: s.id, type: "text", duration: SAMPLE_SECONDS })) } };
   const index = buildIndex(mini, { outDir: root });
   const times = scenes.map((s) => Math.round((index.starts[s.id].start + SAMPLE_SECONDS * 0.75) * 100) / 100);

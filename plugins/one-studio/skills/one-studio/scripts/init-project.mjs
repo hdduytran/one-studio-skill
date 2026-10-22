@@ -13,6 +13,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { ASPECTS, ENGINE_VERSIONS, TEMPLATE_DIR, now, parseArgs, readJson, writeJson } from "./lib/project.mjs";
 import { CAPTION_MODES } from "./lib/captions.mjs";
+import { RATIO_STAGE_VERSION } from "./lib/hash.mjs";
 import { hasDrawtext, hasLibass } from "./lib/ffmpeg.mjs";
 import { PRESET_NAMES, applyPreset } from "./lib/presets.mjs";
 import { listVoices } from "./lib/tts.mjs";
@@ -196,7 +197,7 @@ async function main() {
       sentence_pause: prev?.audio?.sentence_pause ?? 0.25,
       scene_padding: prev?.audio?.scene_padding ?? 0.5,
     },
-    render: prev?.render ?? { quality: "looks", preview_height: 540, out_dir: "out", codec: "h264", pix_fmt: "yuv420p" },
+    render: prev?.render ?? { quality: "looks", preview_height: 540, out_dir: "out", codec: "h264", pix_fmt: "yuv420p", ratio_stage: RATIO_STAGE_VERSION },
     credit: prev?.credit ?? { warn_scenes: 8, warn_types: ["3d", "character", "explainer"] },
   };
   writeJson(join(root, "studio.json"), studio);

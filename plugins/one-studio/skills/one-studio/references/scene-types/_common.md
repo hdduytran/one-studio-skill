@@ -12,7 +12,7 @@ Read once per session before writing the first scene; each type file adds only i
 - Colours, fonts, sizes: brand variables and `os-*` classes only (`var(--c-accent)`, `.os-h1`, `.os-accent`…). Never a literal hex in a scene.
 - Sizes in `calc(N * var(--u))` (1 unit = 1 px at 1080 on the short side) so 9:16 / 1:1 exports work.
 - Keep the bottom `--caption-zone` empty (captions are burned there).
-- Ratio-specific layout: a `<style data-ratio="9:16">` (or `"1:1,4:5"`) block in `<head>`, comments inside the CSS. It applies only at that ratio and is hashed only for it, so the main ratio's approval and clip stay valid. Keep using `.os-portrait` / `.os-square` selectors inside it if you like.
+- Ratio-specific layout: a `<style data-ratio="9:16">` (or `"1:1,4:5"`) block in `<head>`, comments inside the CSS. It applies only at that ratio and is hashed only for it, so the main ratio's approval and clip stay valid. The block is removed before any other ratio is rendered, so plain ID rules (even `!important`) are safe; `.os-portrait` / `.os-square` selectors inside it are still allowed.
 - Cards: `.os-card` (or `.os-glass`). With `brand.surface: "glass"` they become frosted glass over a brand-colour wallpaper automatically; never link extra CSS for it.
 - Deterministic: every tween on the scene timeline via the `OS.scene()` helpers or `S.tl` at an absolute time. No `setTimeout`, `requestAnimationFrame`, `Date.now()`, unseeded `Math.random()`, CSS animations or network fetches.
 - Assets local under `assets/` (run `optimize-assets.mjs` after adding SVG/Lottie). No CDN URLs.

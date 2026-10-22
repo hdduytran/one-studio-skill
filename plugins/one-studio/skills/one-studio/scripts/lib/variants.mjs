@@ -2,7 +2,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { ASPECTS, linkSharedDirs, sha256 } from "./project.mjs";
-import { sceneHash } from "./hash.mjs";
+import { sceneHash, stripRatioStyles } from "./hash.mjs";
 import { run } from "./ffmpeg.mjs";
 
 export const ratioTag = (aspect) => aspect.replace(":", "x");
@@ -18,9 +18,12 @@ export function resizeHtml(html, from, to) {
     .replace(new RegExp(`(<canvas[^>]*?)width="${from.width}"([^>]*?)height="${from.height}"`, "g"), `$1width="${to.width}"$2height="${to.height}"`);
 }
 
-// Folder that mirrors the project for one aspect ratio: scenes/ rewritten, assets/ linked.
-export function variantRoot(project, aspect) {
-  const root = join(project.root, ".one-studio", "variants", ratioTag(aspect));
+// Folder that mirrors the project for one aspect ratio: scenes/ resized with only that ratio's
+// <style data-ratio> blocks left in (see stripRatioStyles), assets/ linked.
+// The main ratio uses it too (ids: the scenes to stage, name: a folder of its own), so HyperFrames never sees
+// another ratio's block. The caller removes the folder when done.
+export function variantRoot(project, aspect, { ids = null, name = ratioTag(aspect) } = {}) {
+  const root = join(project.root, ".one-studio", "variants", name);
   rmSync(root, { recursive: true, force: true });
   mkdirSync(join(root, "scenes"), { recursive: true });
   symlinkSync(join(project.root, "assets"), join(root, "assets"), "dir");
@@ -30,8 +33,9 @@ export function variantRoot(project, aspect) {
   const from = { width: project.studio.format.width, height: project.studio.format.height };
   const to = ASPECTS[aspect];
   for (const s of project.storyboard?.scenes ?? []) {
+    if (ids && !ids.includes(s.id)) continue;
     const file = join(project.root, "scenes", `${s.id}.html`);
-    if (existsSync(file)) writeFileSync(join(root, "scenes", `${s.id}.html`), resizeHtml(readFileSync(file, "utf8"), from, to));
+    if (existsSync(file)) writeFileSync(join(root, "scenes", `${s.id}.html`), stripRatioStyles(resizeHtml(readFileSync(file, "utf8"), from, to), aspect));
   }
   writeFileSync(join(root, "index.html"), `<!doctype html><html><body><div data-composition-id="main" data-start="0" data-duration="1" data-width="${to.width}" data-height="${to.height}"></div></body></html>`);
   return root;

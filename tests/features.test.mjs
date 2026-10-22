@@ -11,8 +11,8 @@ import { loadProject, validateKind } from "../plugins/one-studio/skills/one-stud
 import { renderBed, keyOffset, wavBytes } from "../plugins/one-studio/skills/one-studio/scripts/lib/music.mjs";
 import { SFX_NAMES, makeSfx, placeCues } from "../plugins/one-studio/skills/one-studio/scripts/lib/sfx.mjs";
 import { captionMode, captionSetting } from "../plugins/one-studio/skills/one-studio/scripts/lib/captions.mjs";
-import { sceneHash, sceneText } from "../plugins/one-studio/skills/one-studio/scripts/lib/hash.mjs";
-import { variantHash } from "../plugins/one-studio/skills/one-studio/scripts/lib/variants.mjs";
+import { sceneHash, sceneText, stripRatioStyles } from "../plugins/one-studio/skills/one-studio/scripts/lib/hash.mjs";
+import { variantHash, variantRoot } from "../plugins/one-studio/skills/one-studio/scripts/lib/variants.mjs";
 import { gateInputHash, gateProblems } from "../plugins/one-studio/skills/one-studio/scripts/lib/gates.mjs";
 import { writeLineTimes } from "../plugins/one-studio/skills/one-studio/scripts/lib/scenes.mjs";
 import { applyPreset, assertCachePresetName, loadPresets, PRESET_NAMES, saveCachePreset } from "../plugins/one-studio/skills/one-studio/scripts/lib/presets.mjs";
@@ -162,6 +162,36 @@ test("ratio-scoped <style data-ratio> blocks: main hash ignores other ratios, va
   writeFileSync(join(dir, "scenes", "s01.html"), `<head>\n</head>\n${base}`);
   assert.equal(sceneHash(p(), s()), withHead);
   assert.equal(sceneText('a data-duration="4.2" b', { layoutOnly: true }), 'a data-duration="" b');
+});
+
+test("ratio blocks are removed before HyperFrames sees them (it merges adjacent <style> and drops data-ratio)", () => {
+  const html = `<head>\n<style>.a{}</style>\n<style data-ratio="9:16">#ph{left:0!important}</style>\n</head>`;
+  assert.equal(stripRatioStyles(html, "16:9"), "<head>\n<style>.a{}</style>\n</head>");
+  assert.equal(stripRatioStyles(html, "9:16"), html);
+  const dir = project({ html: { s01: `${html}\n<div id="root" data-composition-id="s01" data-width="1920" data-height="1080"></div>` } });
+  const p = loadProject(dir);
+  const main = variantRoot(p, "16:9", { ids: ["s01"], name: "t-main" });
+  assert.ok(!readFileSync(join(main, "scenes", "s01.html"), "utf8").includes("data-ratio"), "main ratio: block gone");
+  const tall = variantRoot(p, "9:16");
+  const t = readFileSync(join(tall, "scenes", "s01.html"), "utf8");
+  assert.ok(t.includes('data-ratio="9:16"') && t.includes('data-width="1080"'), "9:16: block kept, resized");
+});
+
+test("projects from before ratio staging re-make scenes with ratio blocks once; new projects never do", () => {
+  const base = `<div id="root" data-composition-id="s01" data-duration="4"></div>`;
+  const block = `<style data-ratio="9:16">#root{left:0}</style>\n`;
+  const dir = project({ html: { s01: base } });
+  assert.equal(readJson(join(dir, "studio.json")).render.ratio_stage, 1, "new projects are marked");
+  const h = () => sceneHash(loadProject(dir), loadProject(dir).storyboard.scenes[0]);
+  const plain = h();
+  writeFileSync(join(dir, "scenes", "s01.html"), block + base);
+  assert.equal(h(), plain, "new project: ratio block keeps the main hash");
+  const st = readJson(join(dir, "studio.json"));
+  delete st.render.ratio_stage;
+  writeJson(join(dir, "studio.json"), st);
+  assert.notEqual(h(), plain, "older project: possibly leaked stills/clips are made again");
+  writeFileSync(join(dir, "scenes", "s01.html"), base);
+  assert.equal(h(), plain, "older project without ratio blocks: hash unchanged");
 });
 
 test("writeLineTimes is idempotent and only touches scenes that use data-line", () => {

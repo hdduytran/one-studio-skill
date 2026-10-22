@@ -351,6 +351,11 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 51
+        },
+        "ratio_stage": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Set on projects created after <style data-ratio> blocks were staged per ratio at render time; older projects re-render scenes that have ratio blocks once."
         }
       }
     },
