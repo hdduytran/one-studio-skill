@@ -238,3 +238,12 @@ test("presets + glass surface; music choice; thumb-frame spec", () => {
   assert.deepEqual(parseThumbFrame("s01＠3", p), { id: "s01", t: 3 });
   assert.throws(() => parseThumbFrame("s09@1", p), /not in storyboard/);
 });
+
+test("infinity-board preset: board palette and a Vietnamese-capable font", () => {
+  assert.ok(PRESET_NAMES().includes("infinity-board"));
+  const brand = applyPreset({ typography: { heading: { family: "Inter" }, body: { family: "Inter" } } }, "infinity-board");
+  assert.equal(brand.preset, "infinity-board");
+  assert.equal(brand.surface, "flat");
+  assert.match(brand.typography.heading.fontsource, /^be-vietnam-pro@/);
+  assert.match(brand.typography.body.fontsource, /^be-vietnam-pro@/);
+});

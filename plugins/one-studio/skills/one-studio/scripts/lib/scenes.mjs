@@ -144,7 +144,9 @@ export const listSceneFiles = (project) =>
 const LINES_RE = /<script\b[^>]*\bid\s*=\s*["']os-lines["'][^>]*>[\s\S]*?<\/script>\n?/i;
 // Opinion and quote lines carry an on-screen label while they are spoken (see S.done in os.js).
 const labelled = (scene) => (scene.lines ?? []).some((l) => l.kind === "opinion" || l.kind === "quote");
-export const usesLineSync = (html) => /\bdata-line\s*=/.test(html) || LINES_RE.test(html);
+// World scenes count too: their data-line pieces live in worlds/<name>.html and are revealed via S.line().
+export const usesLineSync = (html) =>
+  /\bdata-line\s*=/.test(html) || LINES_RE.test(html) || /<link\b[^>]*\brel\s*=\s*["']x-world["']/i.test(html);
 
 // Text of the chip shown while a line is spoken: "Ý KIẾN" / "OPINION", or "speaker · source name" for quotes.
 export function lineLabel(line, language, research = []) {

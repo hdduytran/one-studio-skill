@@ -48,5 +48,14 @@
     "typography": {
       "heading": { "family": "Inter", "weight": 800, "fontsource": "inter@5.2.8", "fallback": "Helvetica, Arial, sans-serif" }
     }
+  },
+  "infinity-board": {
+    "about": "Infinite whiteboard: warm off-white board, ink black, sticky-note green, red and yellow. Be Vietnam Pro (full Vietnamese).",
+    "surface": "flat",
+    "colors": { "bg": "#f5f4ef", "fg": "#1c1e22", "primary": "#0b8a4a", "secondary": "#d7262e", "accent": "#f4c430", "muted": "#8a8d94" },
+    "typography": {
+      "heading": { "family": "Be Vietnam Pro", "weight": 800, "fontsource": "be-vietnam-pro@5.3.0", "fallback": "system-ui, sans-serif" },
+      "body": { "family": "Be Vietnam Pro", "weight": 500, "fontsource": "be-vietnam-pro@5.3.0", "fallback": "system-ui, sans-serif" }
+    }
   }
 }

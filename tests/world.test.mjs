@@ -144,3 +144,18 @@ test("seam-check reports bad usage", () => {
   assert.equal(run("seam-check.mjs", dir, "--threshold", "-1").code, 1);
   assert.equal(run("seam-check.mjs", dir, "--pairs", "s01:s09").code, 1);
 });
+
+test("seam-check reads tiny YAVG values printed in exponent form", async () => {
+  const { parseYavg } = await import("../plugins/one-studio/skills/one-studio/scripts/seam-check.mjs");
+  assert.equal(parseYavg("frame:0\nlavfi.signalstats.YAVG=9.64506e-06\n"), 9.64506e-06);
+  assert.equal(parseYavg("lavfi.signalstats.YAVG=12.5\n"), 12.5);
+  assert.equal(parseYavg("nothing here"), null);
+});
+
+test("world scenes get VO line timings even when their data-line pieces live in the world file", async () => {
+  const { usesLineSync } = await import("../plugins/one-studio/skills/one-studio/scripts/lib/scenes.mjs");
+  const world = '<div id="root"><link rel="x-world" href="../worlds/board.html" /><div class="os-world"></div></div>';
+  assert.equal(usesLineSync(world), true);
+  assert.equal(usesLineSync('<p data-line="s01-1">hi</p>'), true);
+  assert.equal(usesLineSync('<div id="root"><h1>Title</h1></div>'), false);
+});

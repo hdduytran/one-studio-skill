@@ -17,6 +17,9 @@ Scene: `mode: "world-camera"`, `world: "city"`, `camera: { from: "downtown", to:
 - Continuity is checked: `camera.to` of N equals `camera.from` of N+1 (same form: place id, or the same numbers), `exit_state` equals the next `enter_state`; transitions between them are `cut`. `seam-check.mjs` compares the real frames (gate 5 runs it).
 - Brand variables only; deterministic.
 
+- Board built over many scenes (infinite whiteboard): put every piece in the world file with `data-reveal="<scene id>"` (the scene that adds it) and `data-line="<line id>"` (the sentence that brings it in). Each scene's script hides pieces whose `data-reveal` is later than its own id and enters its own pieces at `S.line(id, estimate)`; earlier pieces stay as they are. Seams then match exactly, and the last scene can pull back over the finished board. Do not call `S.lines()` here: it would also animate the other scenes' pieces. Use the CSS `rotate` property for tilted notes so entrance tweens (which own `transform`) keep the tilt, and give pieces `width: max-content` since the world layer has no width.
+- Size places close to the frame ratio (a grid of 16:9 panels); a long thin place fits by its long side and its text turns tiny.
+
 ## Traps
 - Camera ends where the next scene does not start: seam-check fails, the viewer sees a jump.
 - Two scenes in one world with a fade between them: use `cut`.

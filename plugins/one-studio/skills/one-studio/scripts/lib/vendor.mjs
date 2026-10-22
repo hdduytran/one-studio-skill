@@ -93,5 +93,6 @@ export function vendorFontsource(spec, weights, assetsDir) {
 
 export function svgoBin() {
   const pkg = ensurePackage("svgo", PINS.svgo);
-  return join(dirname(dirname(pkg)), ".bin", "svgo");
+  // pkg = <prefix>/node_modules/svgo; npm links the CLI into <prefix>/node_modules/.bin.
+  return join(dirname(pkg), ".bin", "svgo");
 }
