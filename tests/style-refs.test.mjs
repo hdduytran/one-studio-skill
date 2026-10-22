@@ -105,12 +105,12 @@ test("ensureGitignore writes the footage patterns once and keeps other lines", (
   assert.equal(lib.ensureGitignore(dir), true);
   const file = join(dir, "style-refs", ".gitignore");
   const first = readFileSync(file, "utf8");
-  assert.deepEqual(first.trim().split("\n"), ["*/source.*", "*/frames/"]);
+  assert.deepEqual(first.trim().split("\n"), ["*/source.*", "*/frames/", "*/subs.vtt"]);
   assert.equal(lib.ensureGitignore(dir), false);
   assert.equal(readFileSync(file, "utf8"), first);
   writeFileSync(file, "keep-me\n*/source.*");
   assert.equal(lib.ensureGitignore(dir), true);
-  assert.deepEqual(readFileSync(file, "utf8").trim().split("\n"), ["keep-me", "*/source.*", "*/frames/"]);
+  assert.deepEqual(readFileSync(file, "utf8").trim().split("\n"), ["keep-me", "*/source.*", "*/frames/", "*/subs.vtt"]);
 });
 
 test("loadStyle reads a valid card and lists every problem of an invalid one", () => {

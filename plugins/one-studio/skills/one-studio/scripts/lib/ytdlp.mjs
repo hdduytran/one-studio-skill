@@ -3,6 +3,7 @@
 import { spawnSync } from "node:child_process";
 
 export const DEFAULT_MAX_SECONDS = 90;
+export const DOWNLOAD_TIMEOUT_MS = 10 * 60_000;
 export const INSTALL_HELP = "brew install yt-dlp   (or: pipx install yt-dlp)";
 
 // "90", "1:30", "0:01:30.5" -> seconds. Throws on anything else.
@@ -37,6 +38,19 @@ export function assertHttpUrl(text) {
   return url.href;
 }
 
+// The link without `user:pass@`; path and query stay (YouTube needs ?v=). Non-links come back unchanged.
+export function stripUserinfo(text) {
+  if (typeof text !== "string") return text;
+  try {
+    const url = new URL(text);
+    url.username = "";
+    url.password = "";
+    return url.href;
+  } catch {
+    return text;
+  }
+}
+
 export const looksLikeUrl = (text) => /^[a-z][a-z0-9+.-]*:\/\//i.test(text);
 
 // Binary: ONE_STUDIO_YTDLP, else yt-dlp on PATH. Returns the command or null.
@@ -48,6 +62,7 @@ export function findYtdlp(env = process.env) {
 // Argument array (never a shell string). `to` null means "until the end".
 export function buildArgs({ url, dir, from, to }) {
   return [
+    "--ignore-config",
     "-f", "bv*[height<=720]+ba/b[height<=720]",
     "--download-sections", `*${from}-${to ?? "inf"}`,
     "--no-playlist",
@@ -55,7 +70,7 @@ export function buildArgs({ url, dir, from, to }) {
     "--write-subs", "--write-auto-subs", "--sub-langs", "vi.*,en.*", "--sub-format", "vtt",
     "--no-cookies-from-browser",
     "--no-mtime",
-    "-o", `${dir}/source.%(ext)s`,
+    "-o", `${dir.replace(/%/g, "%%")}/source.%(ext)s`,
     "--", url,
   ];
 }
@@ -92,7 +107,7 @@ export function filterInfo(raw = {}) {
   return {
     title: pick(raw.title, "string"),
     channel: pick(raw.uploader, "string"),
-    url: pick(raw.webpage_url, "string"),
+    url: stripUserinfo(pick(raw.webpage_url, "string")),
     duration: pick(raw.duration, "number"),
     extractor: pick(raw.extractor, "string"),
     width: pick(raw.width, "number"),

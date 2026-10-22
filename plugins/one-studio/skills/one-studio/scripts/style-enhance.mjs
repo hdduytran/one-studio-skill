@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 // Proposals that make an extracted style better; only what the user accepts is applied.
 //   node style-enhance.mjs <project-dir> <slug> [--no-sheet] [--offline]    list numbered proposals + before/after sheet
-//   node style-enhance.mjs <project-dir> <slug> --accept 1,3|all            write them to style.enhance.json (variants/<v>.json, parts/)
+//   node style-enhance.mjs <project-dir> <slug> --accept 1,3|all|id,id     write them to style.enhance.json (variants/<v>.json, parts/)
 //   node style-enhance.mjs <project-dir> <slug> --reject 2                   never propose these rules again
 // Sheet: review/style-<slug>-enhance.jpg, one row per proposal that changes how a sample looks (before | after).
-// The numbers are positions in the list the same command prints, so list first, then accept. Rules and thresholds:
+// Each proposal keeps the number of its rule (gaps appear when a rule has nothing to propose), so accepting or
+// rejecting one never renumbers the others; rule ids are accepted in place of numbers. Rules and thresholds:
 // skills/style-extract/references/enhance-rules.md. Re-running after an accept lists only what is left.
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -18,13 +19,17 @@ import { contactSheet } from "./keyframe-stills.mjs";
 
 const brandOf = (project, style, slug) => ({ ...mergeBrandPatch(project.brand, style.brand), name: `${project.brand.name} · ${slug}` });
 
-// "1,3" / "all" -> proposals; refuses numbers outside the list.
+// "1,3" / "contrast,token-gaps" / "all" -> proposals. A number is the one printed by the list (it is the rule's
+// own number, so it does not change after an accept or reject); a rule id works too. Anything else is refused.
 export function pick(proposals, spec) {
   if (spec === "all") return proposals;
-  const nums = String(spec).split(",").map((s) => Number(s.trim()));
-  const bad = nums.filter((n) => !Number.isInteger(n) || n < 1 || n > proposals.length);
-  if (bad.length || !nums.length) throw new Error(`pick numbers from 1 to ${proposals.length} (or "all"), got "${spec}"`);
-  return [...new Set(nums)].map((n) => proposals[n - 1]);
+  const tokens = String(spec).split(",").map((s) => s.trim()).filter(Boolean);
+  const found = tokens.map((t) => proposals.find((p) => (/^\d+$/.test(t) ? p.n === Number(t) : p.id === t)));
+  if (!tokens.length || found.includes(undefined)) {
+    const valid = proposals.map((p) => `${p.n} (${p.id})`).join(", ") || "none";
+    throw new Error(`pick from the listed proposals: ${valid}, or "all"; got "${spec}"`);
+  }
+  return [...new Set(found)];
 }
 
 // Writes the accepted proposals. Everything is validated first, so a refusal writes nothing.
@@ -84,7 +89,7 @@ export function enhanceSheet(project, ctx, proposals, { offline = false } = {}) 
   try {
     proposals.forEach((p, i) => {
       if (!p.sample) return;
-      const n = i + 1;
+      const n = p.n;
       const ratio = p.ratio ?? defaultRatio;
       const root = join(base, `item-${n}`);
       if (p.sample === "parts") {
@@ -136,17 +141,17 @@ if (isMain(import.meta.url)) {
       console.log(vi ? "Không có đề xuất nào: style đã ổn với các luật hiện có." : "No proposals: the style passes every rule.");
       process.exit(0);
     }
-    proposals.forEach((p, i) => console.log(`${i + 1}. [${p.id}] ${p.title}\n   ${p.why}`));
+    proposals.forEach((p) => console.log(`${p.n}. [${p.id}] ${p.title}\n   ${p.why}`));
     if (!args["no-sheet"]) {
       const { sheet, rows } = enhanceSheet(project, ctx, proposals, { offline: args.offline });
       if (sheet) {
         console.log(`Sheet: ${relative(process.cwd(), sheet) || sheet}`);
         rows.forEach((r, i) => console.log(`  row ${i + 1} left to right: ${r.tiles.join(" | ")}`));
       }
-      const plain = proposals.map((p, i) => (p.sample ? null : `${i + 1} ${p.id}`)).filter(Boolean);
+      const plain = proposals.map((p) => (p.sample ? null : `${p.n} ${p.id}`)).filter(Boolean);
       if (plain.length) console.log(`${vi ? "Không có ảnh (đổi số/khoá)" : "No picture (numbers or locks)"}: ${plain.join(", ")}`);
     }
-    console.log(vi ? "Giải thích từng mục bằng lời thường, hỏi người dùng nhận mục nào, rồi: style-enhance.mjs <dir> <slug> --accept 1,3 (hoặc --reject)." : "Explain each in plain words, ask which to accept, then: style-enhance.mjs <dir> <slug> --accept 1,3 (or --reject).");
+    console.log(vi ? "Giải thích từng mục bằng lời thường, hỏi người dùng nhận mục nào, rồi: style-enhance.mjs <dir> <slug> --accept 1,3 hoặc --accept contrast,token-gaps (hoặc --reject); số không đổi sau khi nhận." : "Explain each in plain words, ask which to accept, then: style-enhance.mjs <dir> <slug> --accept 1,3 or --accept contrast,token-gaps (or --reject); numbers stay the same after an accept.");
   } catch (err) {
     console.error(err.message);
     process.exit(1);

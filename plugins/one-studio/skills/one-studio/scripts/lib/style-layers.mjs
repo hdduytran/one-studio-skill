@@ -18,6 +18,14 @@ export const SECTIONS = ["brand", "storyboard", "writing", "audio"];
 export const SERIES_OWNED = ["brand.logo", "brand.voice", "brand.intro", "brand.outro", "brand.lower_third"];
 const META_KEYS = ["provenance", "locked", "applied", "rejected"];
 export const VARIANT_RE = /^[a-z0-9][a-z0-9-]*$/;
+// Names that map to the base layers (style.enhance.json, style.custom.json): never usable as a variant.
+export const RESERVED_VARIANTS = ["custom", "enhance"];
+const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+// Throws unless `name` is a usable variant name (kebab-case, not a reserved layer name).
+export function assertVariantName(name) {
+  if (!VARIANT_RE.test(name ?? "")) throw new Error(`variant must be kebab-case (a-z, 0-9, -), got "${name}"`);
+  if (RESERVED_VARIANTS.includes(name)) throw new Error(`variant name "${name}" is reserved for a base layer; pick another (tên biến thể đã được dành riêng)`);
+}
 
 export const isObj = (v) => Boolean(v) && typeof v === "object" && !Array.isArray(v);
 export const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -35,6 +43,7 @@ export const provenanceKeys = (unit, value) => [...new Set(leafPaths(value, unit
 export const getPath = (obj, path) => path.split(".").reduce((o, k) => (isObj(o) ? o[k] : undefined), obj);
 export function setPath(obj, path, value) {
   const parts = path.split(".");
+  if (parts.some((k) => UNSAFE_KEYS.has(k))) throw new Error(`invalid field "${path}"`);
   let o = obj;
   for (const k of parts.slice(0, -1)) o = isObj(o[k]) ? o[k] : (o[k] = {});
   o[parts.at(-1)] = value;
@@ -77,6 +86,7 @@ export const isLocked = (locked, path) => locked.some((l) => path === l || path.
 
 function mergeInto(target, src, path) {
   for (const [k, v] of Object.entries(src)) {
+    if (UNSAFE_KEYS.has(k)) continue;
     const p = `${path}.${k}`;
     target[k] = isObj(v) && isObj(target[k]) && !ATOMIC_UNITS.has(p) ? mergeInto(target[k], v, p) : clone(v);
   }
@@ -132,7 +142,7 @@ export const hasLayer = (project, slug, name) => existsSync(layerFile(project, s
 
 // The four layers of one style; a requested variant must exist unless `create` is set.
 export function loadLayers(project, slug, variant, { create = false } = {}) {
-  if (variant && !VARIANT_RE.test(variant)) throw new Error(`variant must be kebab-case (a-z, 0-9, -), got "${variant}"`);
+  if (variant) assertVariantName(variant);
   if (variant && !create && !hasLayer(project, slug, variant)) throw new Error(`No variant "${variant}" for style "${slug}" (expected ${layerFile(project, slug, variant)}); create it with style-set --variant or style-enhance`);
   const base = loadStyle(project, slug);
   const layers = [["enhance", readLayer(project, slug, "enhance")], ["custom", readLayer(project, slug, "custom")], ...(variant ? [[variant, readLayer(project, slug, variant)]] : [])];

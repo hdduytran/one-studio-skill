@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:f
 import { join, relative } from "node:path";
 import { hasFilter, probe } from "./lib/ffmpeg.mjs";
 import { isMain, now, parseArgs, readJson, writeJson } from "./lib/project.mjs";
-import { styleDir } from "./lib/style-refs.mjs";
+import { existingSlug, styleDir } from "./lib/style-refs.mjs";
 import { contactSheet, findFont } from "./lib/contact-sheet.mjs";
 import { audioPass, ffmpegVersion, grabJpg, grabRaw, PALETTE_WIDTH, scaledSize, videoPass } from "./lib/style-measure.mjs";
 import { buildTimeline, letterbox, motionStats, parseAudio, parseBlack, parseFrameMetadata, summarize, toneStats } from "./lib/style-metrics.mjs";
@@ -25,6 +25,7 @@ const aspectName = (w, h) => {
 };
 
 export function analyze(dir, slug, { threshold = 10, frames: nFrames = 12, cuts: nCuts = 6 } = {}) {
+  existingSlug(dir, slug);
   const sd = styleDir(dir, slug);
   const sourceName = existsSync(sd) ? readdirSync(sd).find((f) => /^source\./.test(f)) : null;
   if (!sourceName) throw new Error(`No source video in ${sd} (run style-fetch.mjs first)`);
@@ -53,9 +54,11 @@ export function analyze(dir, slug, { threshold = 10, frames: nFrames = 12, cuts:
   // Colour: the middle frame of up to 40 shots, small, overlays masked.
   const pw = PALETTE_WIDTH;
   const ph = scaledSize(width, height, pw).h;
+  const box = letterbox(frames, v.scaled);
+  const rect = box?.detected && box.rect && box.rect.w * box.rect.h >= 0.1 ? box.rect : null;
   const pixels = evenly(timeline.shots.length, MAX_COLOR_SHOTS).flatMap((i) => {
     const s = timeline.shots[i];
-    return framePixels(grabRaw(src, (s.start + s.end) / 2, duration, pw, ph), pw, ph, { platform });
+    return framePixels(grabRaw(src, (s.start + s.end) / 2, duration, pw, ph), pw, ph, { platform, rect });
   });
   const color = extractPalette(pixels);
 
@@ -100,7 +103,7 @@ export function analyze(dir, slug, { threshold = 10, frames: nFrames = 12, cuts:
     params: { threshold, frames: nFrames, cuts: nCuts, platform, analysis_width: v.scaled.w, palette_seed: SEED },
     unavailable_filters: [...new Set(skipped)].sort(),
     source: { file: sourceName },
-    format: { width, height, aspect: aspectName(width, height), fps: +fps.toFixed(3), duration, letterbox: letterbox(frames, v.scaled) },
+    format: { width, height, aspect: aspectName(width, height), fps: +fps.toFixed(3), duration, letterbox: box },
     pacing: timeline,
     color,
     tone,

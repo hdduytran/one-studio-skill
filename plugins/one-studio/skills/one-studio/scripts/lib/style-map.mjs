@@ -1,6 +1,7 @@
 // Metrics -> draft style card. Every table here is documented in skills/style-extract/references/mapping.md;
 // keep the two in step. Pure and deterministic: the same metrics.json gives the same draft.
 import { BUILTIN_BEDS, PRESETS } from "./music.mjs";
+import { stripUserinfo } from "./ytdlp.mjs";
 import { assignColorRoles } from "./style-color-roles.mjs";
 
 // ASL (average shot length, s) -> motion durations (s). Lower bound inclusive, first match wins.
@@ -54,9 +55,13 @@ export function buildDraft(metrics, info = {}, { slug }) {
   const provKeys = (path, obj, source, note) => Object.keys(obj).forEach((k) => prov(`${path}.${k}`, source, note));
   const { pacing, motion, audio, speech, format } = metrics;
   const multiShot = pacing.shots.length >= 2;
+  // A build without scdet cannot measure cuts or motion (they read as one static shot), so what hangs on them is a guess.
+  const noScdet = (metrics.unavailable_filters ?? []).includes("scdet");
+  const noSignalstats = (metrics.unavailable_filters ?? []).includes("signalstats");
+  const motionSource = (note) => (noScdet ? ["guessed", "FFmpeg lacks scdet: motion and cuts were not measured; check by eye"] : ["measured", note]);
 
   const reference = { file: info.file ?? metrics.source?.file ?? "source.mp4", accessed: info.accessed ?? metrics.generated_at, range: info.range ?? { from: 0, to: format.duration } };
-  for (const k of ["url", "title", "channel"]) if (info[k]) reference[k] = info[k];
+  for (const k of ["url", "title", "channel"]) if (info[k]) reference[k] = k === "url" ? stripUserinfo(info[k]) : info[k];
 
   // Colour
   const roles = assignColorRoles(metrics.color?.palette);
@@ -66,8 +71,8 @@ export function buildDraft(metrics, info = {}, { slug }) {
   // Motion: ASL picks durations, profile the easing, class the stagger.
   const lowAsl = pacing.asl_confidence === "low" ? "low-confidence ASL (cuts near the threshold)" : undefined;
   brand.motion = { ease: EASE_BY_PROFILE[motion.profile] ?? EASE_BY_PROFILE.even, stagger: STAGGER_BY_CLASS[motion.class] ?? STAGGER_BY_CLASS.drift };
-  prov("brand.motion.ease", "measured", `motion profile ${motion.profile}`);
-  prov("brand.motion.stagger", "measured", `motion class ${motion.class}`);
+  prov("brand.motion.ease", ...motionSource(`motion profile ${motion.profile}`));
+  prov("brand.motion.stagger", ...motionSource(`motion class ${motion.class}`));
   if (multiShot) {
     brand.motion.duration = pick(ASL_MOTION, pacing.asl).duration;
     prov("brand.motion.duration", "measured", lowAsl ?? `ASL ${pacing.asl}s`);
@@ -97,7 +102,8 @@ export function buildDraft(metrics, info = {}, { slug }) {
   prov("storyboard.target_shot_seconds", multiShot ? "measured" : "guessed", multiShot ? (lowAsl ?? "median shot length") : "no cuts found: default shot length");
   const cutRate = pacing.cuts_per_min ?? 0;
   storyboard.sfx_density = audio.has_audio ? pick(SFX_BY_CUT_RATE, cutRate).density : "none";
-  prov("storyboard.sfx_density", "measured", audio.has_audio ? `${cutRate} cuts/min` : "reference has no audio track");
+  if (!audio.has_audio) prov("storyboard.sfx_density", "measured", "reference has no audio track");
+  else prov("storyboard.sfx_density", ...motionSource(`${cutRate} cuts/min`));
 
   // Audio
   const outAudio = {};
@@ -111,7 +117,9 @@ export function buildDraft(metrics, info = {}, { slug }) {
   prov("audio.has_voice", "measured", speech.has_voice_source === "subs" ? "from subtitles" : "heuristic from loudness range and silence");
   const bed = pickBed({ motionClass: motion.class, cutsPerMin: cutRate, lumaMean: metrics.tone?.luma_mean ?? 0.5 });
   outAudio.music = bed.music;
-  provKeys("audio.music", bed.music, "measured", `nearest built-in bed "${bed.name}" by energy and brightness; the reference track is never reused`);
+  const bedNote = `nearest built-in bed "${bed.name}" by energy and brightness; the reference track is never reused`;
+  const [bedSource, bedWhy] = noScdet || noSignalstats ? ["guessed", `${bedNote} (FFmpeg lacks ${noScdet ? "scdet" : "signalstats"}: energy or brightness was not measured)`] : ["measured", bedNote];
+  provKeys("audio.music", bed.music, bedSource, bedWhy);
 
   // Writing
   const writing = {};

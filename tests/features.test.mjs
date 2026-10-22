@@ -15,7 +15,7 @@ import { sceneHash, sceneText } from "../plugins/one-studio/skills/one-studio/sc
 import { variantHash } from "../plugins/one-studio/skills/one-studio/scripts/lib/variants.mjs";
 import { gateInputHash, gateProblems } from "../plugins/one-studio/skills/one-studio/scripts/lib/gates.mjs";
 import { writeLineTimes } from "../plugins/one-studio/skills/one-studio/scripts/lib/scenes.mjs";
-import { applyPreset, loadPresets, PRESET_NAMES } from "../plugins/one-studio/skills/one-studio/scripts/lib/presets.mjs";
+import { applyPreset, assertCachePresetName, loadPresets, PRESET_NAMES, saveCachePreset } from "../plugins/one-studio/skills/one-studio/scripts/lib/presets.mjs";
 import { brandToCss } from "../plugins/one-studio/skills/one-studio/scripts/brand-to-css.mjs";
 import { parseThumbFrame } from "../plugins/one-studio/skills/one-studio/scripts/publish.mjs";
 
@@ -248,7 +248,7 @@ test("infinity-board preset: board palette and a Vietnamese-capable font", () =>
   assert.match(brand.typography.body.fontsource, /^be-vietnam-pro@/);
 });
 
-test("cached presets join the plugin presets; init-project --preset takes them; a plugin name clash is an error", () => {
+test("cached presets join the plugin presets; init-project --preset takes them; a plugin name clash is skipped with a warning", () => {
   const cache = tmp();
   const prev = process.env.ONE_STUDIO_CACHE;
   process.env.ONE_STUDIO_CACHE = cache;
@@ -274,7 +274,27 @@ test("cached presets join the plugin presets; init-project --preset takes them; 
     assert.equal(p.brand.surface, "glass");
 
     writeJson(join(cache, "presets", "synthwave.json"), entry);
-    assert.throws(() => loadPresets(), /clashes with a plugin preset/);
+    const warnings = [];
+    const warn = console.warn;
+    console.warn = (m) => warnings.push(m);
+    try {
+      const all = loadPresets();
+      assert.notDeepEqual(all.synthwave, entry, "the plugin preset wins");
+      assert.ok(all["cached-look"], "other cached presets still load");
+    } finally {
+      console.warn = warn;
+    }
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0], /synthwave/);
+    assert.ok(!warnings[0].includes("\n"), "one line");
+    console.warn = () => {};
+    try {
+      assert.ok(PRESET_NAMES().includes("synthwave") && applyPreset(readJson("examples/demo/brand/brand.json"), "synthwave").preset === "synthwave", "init and compare keep working");
+    } finally {
+      console.warn = warn;
+    }
+    assert.throws(() => assertCachePresetName("synthwave"), /plugin preset/);
+    assert.throws(() => saveCachePreset("synthwave", entry), /plugin preset/);
   } finally {
     if (prev === undefined) delete process.env.ONE_STUDIO_CACHE;
     else process.env.ONE_STUDIO_CACHE = prev;

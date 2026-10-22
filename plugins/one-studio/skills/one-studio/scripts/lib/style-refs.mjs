@@ -10,11 +10,23 @@ import { effectiveStyle } from "./style-layers.mjs";
 
 export const STYLE_REFS_DIR = "style-refs";
 // Reference footage must never be committed or shipped: only the derived cards are kept.
-export const GITIGNORE_LINES = ["*/source.*", "*/frames/"];
+export const GITIGNORE_LINES = ["*/source.*", "*/frames/", "*/subs.vtt"];
 
 const rootOf = (project) => (typeof project === "string" ? project : project.root);
 export const styleRefsDir = (project) => join(rootOf(project), STYLE_REFS_DIR);
-export const styleDir = (project, slug) => join(styleRefsDir(project), slug);
+export const SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
+// Throws unless `slug` is kebab-case, so no path built from it can leave style-refs/.
+export function assertSlug(slug) {
+  if (typeof slug !== "string" || !SLUG_RE.test(slug)) throw new Error(`invalid style slug "${slug}": use kebab-case (a-z, 0-9, -)`);
+  return slug;
+}
+export const styleDir = (project, slug) => join(styleRefsDir(project), assertSlug(slug));
+// Slug that is valid and has a style-refs/<slug>/ folder; the check every CLI entry point runs before touching files.
+export function existingSlug(project, slug) {
+  const dir = styleDir(project, slug);
+  if (!existsSync(dir)) throw new Error(`No style folder for "${slug}" (expected ${dir}); known: ${listStyleSlugs(project).join(", ") || "none"}`);
+  return slug;
+}
 
 // kebab-case ASCII slug from a video title or file name (Vietnamese diacritics folded).
 export function slugify(hint) {
@@ -31,11 +43,11 @@ export function slugify(hint) {
   return slug || "style";
 }
 
-// Existing style slugs of a project (directories under style-refs/).
+// Existing style slugs of a project (kebab-case directories under style-refs/; dot-dirs such as fetch staging are skipped).
 export function listStyleSlugs(project) {
   const dir = styleRefsDir(project);
   if (!existsSync(dir)) return [];
-  return readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name).sort();
+  return readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory() && SLUG_RE.test(e.name)).map((e) => e.name).sort();
 }
 
 // Unused slug for `hint`: base, then base-2, base-3, ...

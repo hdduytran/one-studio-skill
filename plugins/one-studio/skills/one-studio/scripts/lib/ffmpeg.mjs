@@ -6,8 +6,10 @@ import { dirname } from "node:path";
 
 export const TIMESCALE = 15360;
 
-export function run(bin, args, { quiet = true } = {}) {
-  const r = spawnSync(bin, args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+// `timeout` (ms, optional) kills the process and throws a clear error instead of hanging.
+export function run(bin, args, { quiet = true, timeout } = {}) {
+  const r = spawnSync(bin, args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, ...(timeout && { timeout, killSignal: "SIGKILL" }) });
+  if (r.error?.code === "ETIMEDOUT") throw new Error(`${bin} did not finish within ${Math.round(timeout / 1000)}s and was stopped / ${bin} chạy quá ${Math.round(timeout / 1000)} giây nên đã bị dừng`);
   if (r.error) throw new Error(`${bin} not found or failed to start: ${r.error.message}`);
   if (r.status !== 0) throw new Error(`${bin} ${args.slice(0, 6).join(" ")} … failed:\n${(r.stderr || r.stdout).trim().split("\n").slice(-8).join("\n")}`);
   if (!quiet) process.stdout.write(r.stdout);

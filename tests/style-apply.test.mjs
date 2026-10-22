@@ -303,3 +303,58 @@ test("status shows the style in use and flags it with ! once the card changed af
   apply.applyStyle(dir, "a", {});
   assert.equal(JSON.parse(run("status.mjs", dir, "--json").out).style.changed, false);
 });
+
+test("merge: integer fields stay whole numbers when the median falls between two", () => {
+  const caps = (n) => ({ colors: {}, captions: { position: "middle", size: 52, max_chars: n } });
+  const dir = project({ a: card("a", { brand: caps(20) }), b: card("b", { brand: caps(25) }) });
+  merge.writeMerged(dir, ["a", "b"], "mix");
+  const out = readJson(join(dir, "style-refs", "mix", "style.json"));
+  assert.ok(Number.isInteger(out.brand.captions.max_chars), String(out.brand.captions.max_chars));
+  assert.equal(out.brand.captions.max_chars, 23);
+  assert.equal(merge.median([0.04, 0.05]), 0.045, "floats keep the exact median");
+});
+
+test("applying the same style twice keeps the brand version and the approvals; hints are still written", () => {
+  const dir = project();
+  apply.applyStyle(dir, "a", { keep: true });
+  const first = readJson(join(dir, "brand", "brand.json"));
+  rmSync(join(dir, "style-refs", "a", "hints.json"));
+  const r = apply.applyStyle(dir, "a", { keep: true });
+  assert.equal(readJson(join(dir, "brand", "brand.json")).version, first.version);
+  assert.equal(r.version, first.version);
+  assert.equal(r.reapprove, 0);
+  assert.ok(existsSync(join(dir, "style-refs", "a", "hints.json")), "hints and applied_hash are rewritten");
+  assert.ok(readJson(join(dir, "style-refs", "a", "hints.json")).applied_hash);
+  assert.equal(readJson(join(dir, "studio.json")).story.style.slug, "a");
+  // a real change bumps again
+  writeJson(join(dir, "style-refs", "a", "style.custom.json"), { brand: { colors: { accent: "#00ff88" } }, provenance: { "brand.colors.accent": { source: "seen" } } });
+  apply.applyStyle(dir, "a", { keep: true });
+  assert.equal(readJson(join(dir, "brand", "brand.json")).version, first.version + 1);
+});
+
+test("a preset saved from a style never stores credentials from the reference link", () => {
+  const style = card("a");
+  style.reference.url = "https://me:secret@example.com/v?id=1";
+  const dir = project({ a: style });
+  const entry = apply.presetEntry(style, join(dir, "style-refs", "a"));
+  assert.equal(entry.source.url, "https://example.com/v?id=1");
+});
+
+test("a cached preset that reuses a plugin preset name is skipped; saving such a name is still refused", () => {
+  const cache = join(process.env.ONE_STUDIO_CACHE, "presets");
+  mkdirSync(cache, { recursive: true });
+  const file = join(cache, "apple-light.json");
+  writeJson(file, { about: "x", surface: "flat", colors: { bg: "#000000", fg: "#ffffff", primary: "#ff0000" } });
+  const warn = console.warn;
+  const seen = [];
+  console.warn = (m) => seen.push(m);
+  try {
+    assert.doesNotThrow(() => presets.loadPresets());
+    assert.notEqual(presets.loadPresets()["apple-light"].colors.bg, "#000000");
+  } finally {
+    console.warn = warn;
+    rmSync(file);
+  }
+  assert.ok(seen.length >= 1 && /apple-light/.test(seen[0]));
+  assert.throws(() => presets.saveCachePreset("apple-light", {}), /plugin preset/);
+});

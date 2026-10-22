@@ -1,7 +1,7 @@
 // Minimal JSON Schema (draft 2020-12 subset) validator, zero dependencies.
 // Supports: type, const, enum, properties, required, additionalProperties,
 // items, minItems, maxItems, uniqueItems, minLength, pattern, minimum,
-// maximum, exclusiveMinimum, $ref (local "#/$defs/..."), anyOf, oneOf.
+// maximum, exclusiveMinimum, $ref (local "#/$defs/..."), anyOf, oneOf, not.
 
 const typeOf = (v) =>
   v === null ? "null" : Array.isArray(v) ? "array" : Number.isInteger(v) ? "integer" : typeof v;
@@ -53,6 +53,12 @@ function walk(node, value, path, root, errors) {
     }).length;
     if (key === "anyOf" && passing === 0) errors.push(`${path}: matches none of anyOf`);
     if (key === "oneOf" && passing !== 1) errors.push(`${path}: must match exactly one of oneOf (matched ${passing})`);
+  }
+
+  if (node.not) {
+    const subErrors = [];
+    walk(node.not, value, path, root, subErrors);
+    if (subErrors.length === 0) errors.push(`${path}: value is not allowed here`);
   }
 
   const t = typeOf(value);

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { before, test } from "node:test";
@@ -190,9 +191,35 @@ test("analyze: same input gives identical metrics apart from the timestamp", () 
   assert.deepEqual(strip(analyzeOf("cuts")), first);
 });
 
+test("framePixels with a picture rectangle skips the bars and measures the border ring inside it", () => {
+  const [w, h] = [20, 20];
+  const buf = Buffer.alloc(w * h * 3, 0);
+  for (let y = 5; y < 15; y++) for (let x = 0; x < w; x++) buf.fill(200, (y * w + x) * 3, (y * w + x) * 3 + 3);
+  const all = palette.framePixels(buf, w, h);
+  const inside = palette.framePixels(buf, w, h, { rect: { x: 0, y: 0.25, w: 1, h: 0.5 } });
+  assert.ok(inside.length < all.length);
+  assert.ok(inside.every((p) => p.lab[0] > 0.5), "no black pixel from the bars");
+});
+
+test("analyze: letterbox bars are cropped out of the palette and never become the background", () => {
+  const bars = join(dir, "fx", "bars.mp4");
+  const gen = spawnSync("ffmpeg", ["-nostdin", "-y", "-v", "error", "-f", "lavfi", "-i", "color=c=0xd62828:s=640x200:r=30:d=4", "-vf", "pad=640:360:0:80:black", "-c:v", "libx264", "-pix_fmt", "yuv420p", bars]);
+  assert.equal(gen.status, 0, String(gen.stderr));
+  seed("bars", bars);
+  const m = analyzeOf("bars");
+  assert.equal(m.format.letterbox.detected, true);
+  assert.ok(m.format.letterbox.rect && m.format.letterbox.rect.h < 0.7);
+  const black = m.color.palette.filter((c) => c.L < 0.15);
+  assert.equal(black.length, 0, JSON.stringify(m.color.palette));
+  assert.ok(color.deltaE2000("#d62828", m.color.palette.find((c) => c.bg).hex) <= 4, "the picture colour is the background");
+});
+
 test("analyze: input errors and bad flags exit non-zero with a message", () => {
   const missing = run("style-analyze.mjs", dir, "no-such-style");
   assert.equal(missing.code, 1);
-  assert.match(missing.err, /No source video/);
+  assert.match(missing.err, /No style folder/);
+  const traversal = run("style-analyze.mjs", dir, "../../x");
+  assert.equal(traversal.code, 1);
+  assert.match(traversal.err, /invalid style slug/);
   assert.equal(run("style-analyze.mjs", dir, "still", "--threshold", "0").code, 1);
 });

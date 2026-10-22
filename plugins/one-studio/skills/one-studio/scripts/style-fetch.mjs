@@ -4,12 +4,12 @@
 // Links need studio.json → services.download = true (ask the user first). No cookies, no installs.
 // Result: style-refs/<slug>/source.mp4, info.json {file, title, channel?, url?, platform, duration, range{from,to}, accessed, subs?}
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { isMain, loadProject, now, parseArgs, writeJson } from "./lib/project.mjs";
 import { probe, run } from "./lib/ffmpeg.mjs";
 import { ensureGitignore, newSlug, slugify, styleDir, styleRefsDir } from "./lib/style-refs.mjs";
-import { INSTALL_HELP, assertHttpUrl, buildArgs, classifyError, filterInfo, findYtdlp, looksLikeUrl, platformOf, resolveRange } from "./lib/ytdlp.mjs";
+import { INSTALL_HELP, assertHttpUrl, buildArgs, classifyError, DOWNLOAD_TIMEOUT_MS, filterInfo, findYtdlp, looksLikeUrl, platformOf, resolveRange, stripUserinfo } from "./lib/ytdlp.mjs";
 
 export const CONSENT_HELP = 'Downloading a link needs your OK first (the video is only a style reference and is deleted after the style is applied; you are responsible for the platform\'s terms). After the user agrees, set "services": { "download": true } in studio.json and run this again.\nTải video từ link cần được đồng ý trước: video chỉ để tham khảo style và bị xoá sau khi áp dụng. Sau khi người dùng đồng ý, đặt "services": { "download": true } trong studio.json rồi chạy lại.';
 
@@ -24,12 +24,13 @@ function cutLocal(file, dir, { from, to }) {
   const out = join(dir, "source.mp4");
   run("ffmpeg", ["-nostdin", "-y", "-v", "error", "-ss", String(from), "-i", file, "-t", String(round3(end - from)),
     "-vf", "scale=-2:'min(720,ih)'", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p",
-    "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", out]);
+    "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", out], { timeout: 60_000 + 4000 * (end - from) });
   return { out, to: from + probe(out).duration };
 }
 
-function downloadLink(bin, url, dir, { from, to }) {
-  const r = spawnSync(bin, buildArgs({ url, dir, from, to }), { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, env: process.env });
+function downloadLink(bin, url, dir, { from, to }, timeoutMs = DOWNLOAD_TIMEOUT_MS) {
+  const r = spawnSync(bin, buildArgs({ url, dir, from, to }), { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, env: process.env, timeout: timeoutMs, killSignal: "SIGKILL" });
+  if (r.error?.code === "ETIMEDOUT") throw new Error(`yt-dlp did not finish within ${Math.round(timeoutMs / 1000)}s and was stopped / yt-dlp chạy quá ${Math.round(timeoutMs / 1000)} giây nên đã bị dừng`);
   if (r.error) throw new Error(`Cannot start yt-dlp: ${r.error.message}`);
   if (r.status !== 0) throw new Error(classifyError(r.stderr || r.stdout).message);
   const files = readdirSync(dir);
@@ -51,6 +52,30 @@ function downloadLink(bin, url, dir, { from, to }) {
   return { video, info: filterInfo(raw) };
 }
 
+const STALE_STAGING_MS = 60 * 60_000;
+const pidRunning = (pid) => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return err.code === "EPERM";
+  }
+};
+// Removes `.fetch-<pid>` staging dirs a killed run left behind: owner pid gone, or untouched for over an hour.
+export function removeStaleStaging(refsDir) {
+  if (!existsSync(refsDir)) return [];
+  const removed = [];
+  for (const e of readdirSync(refsDir, { withFileTypes: true })) {
+    const m = e.isDirectory() && /^\.fetch-(\d+)$/.exec(e.name);
+    if (!m || Number(m[1]) === process.pid) continue;
+    const dir = join(refsDir, e.name);
+    if (pidRunning(Number(m[1])) && Date.now() - statSync(dir).mtimeMs < STALE_STAGING_MS) continue;
+    rmSync(dir, { recursive: true, force: true });
+    removed.push(e.name);
+  }
+  return removed;
+}
+
 // Fetches one reference; returns { slug, dir, info }.
 export function fetchStyleSource(project, input, opts = {}) {
   const range = resolveRange({ from: opts.from, to: opts.to, max: opts.max });
@@ -65,6 +90,7 @@ export function fetchStyleSource(project, input, opts = {}) {
   if (opts.slug && existsSync(styleDir(project, opts.slug))) throw new Error(`style-refs/${opts.slug} already exists; pick another --slug`);
 
   ensureGitignore(project);
+  removeStaleStaging(styleRefsDir(project));
   const work = join(styleRefsDir(project), `.fetch-${process.pid}`);
   rmSync(work, { recursive: true, force: true });
   mkdirSync(work, { recursive: true });
@@ -74,14 +100,14 @@ export function fetchStyleSource(project, input, opts = {}) {
       const cut = cutLocal(file, work, range);
       info = { title: basename(file).replace(/\.[^.]+$/, ""), platform: "other", file: "source.mp4", to: cut.to };
     } else {
-      const got = downloadLink(bin, url, work, range);
-      info = { ...got.info, url, platform: platformOf(got.info.extractor, url), file: got.video };
+      const got = downloadLink(bin, url, work, range, opts.downloadTimeoutMs);
+      info = { ...got.info, url: stripUserinfo(url), platform: platformOf(got.info.extractor, url), file: got.video };
       info.to = range.from + probe(join(work, got.video)).duration;
     }
     const slug = opts.slug ?? newSlug(project, info.title ?? basename(file ?? new URL(url).pathname));
     const sourceDuration = probe(join(work, info.file)).duration;
     const record = {
-      ...(url && { url }),
+      ...(info.url && { url: info.url }),
       file: info.file,
       title: info.title,
       ...(info.channel && { channel: info.channel }),

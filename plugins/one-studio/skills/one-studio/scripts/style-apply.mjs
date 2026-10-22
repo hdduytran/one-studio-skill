@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Apply an extracted style to the project.
 //   node style-apply.mjs <project-dir> <slug> [--variant v] [--as-preset name] [--keep] [--dry-run] [--allow-low-contrast]
-//   brand.json        the style's brand patch merged over it (section by section), version +1
+//   brand.json        the style's brand patch merged over it (section by section), version +1 (unchanged when the brand already matches)
 //   studio.json       story.style = {slug, variant?}; story.format / story.tone only when still empty
 //   style-refs/<slug>/hints.json   storyboard / audio / writing hints that gates 3 and 7 read
 //   --as-preset       also saves the look to ${ONE_STUDIO_CACHE}/presets/<name>.json (usable by init-project --preset)
@@ -15,7 +15,12 @@ import { isMain, loadProject, parseArgs, readJson, validateKind, writeJson } fro
 import { mergeBrandPatch, resolveStyle, styleContentHash, styleDir } from "./lib/style-refs.mjs";
 import { PRESET_EXTRA_SECTIONS, assertCachePresetName, loadPresets, saveCachePreset } from "./lib/presets.mjs";
 import { sceneHash, sceneSourceExists } from "./lib/hash.mjs";
+import { stripUserinfo } from "./lib/ytdlp.mjs";
 import { contrastIssues } from "./lib/style-contrast.mjs";
+
+// JSON with object keys sorted, so two brands compare equal whatever their key order.
+const canonical = (v) => JSON.stringify(v, (_, x) => (x && typeof x === "object" && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : 1))) : x));
+const withoutMeta = ({ version, preset, ...rest }) => rest;
 
 // Approved scenes whose approval no longer matches once `brand` is the project's brand (the same
 // comparison render-changed-scenes makes, evaluated for the new brand version).
@@ -46,7 +51,7 @@ export function presetEntry(style, sd) {
     colors: { ...loadPresets().default.colors, ...b.colors },
     ...(Object.keys(fonts).length && { typography: fonts }),
     ...Object.fromEntries(PRESET_EXTRA_SECTIONS.filter((k) => b[k]).map((k) => [k, b[k]])),
-    source: { slug: style.slug, ...(style.reference.url && { url: style.reference.url }), ...(style.reference.title && { title: style.reference.title }) },
+    source: { slug: style.slug, ...(style.reference.url && { url: stripUserinfo(style.reference.url) }), ...(style.reference.title && { title: style.reference.title }) },
   };
 }
 
@@ -63,9 +68,14 @@ export function applyStyle(dir, slug, { variant, asPreset, keep = false, dryRun 
   if (!project.brand) throw new Error("brand.json not found; run init-project.mjs first");
   const style = resolveStyle(project, slug, { variant });
   const sd = styleDir(project, slug);
-  const brand = mergeBrandPatch(project.brand, style.brand);
-  brand.version = (project.brand.version ?? 1) + 1;
-  delete brand.preset; // the colours no longer match the preset the kit started from
+  const merged = mergeBrandPatch(project.brand, style.brand);
+  // Applying a style the brand already carries changes nothing: keep the version (no scene is re-opened) and the preset.
+  const unchanged = canonical(withoutMeta(merged)) === canonical(withoutMeta(project.brand));
+  const brand = unchanged ? project.brand : merged;
+  if (!unchanged) {
+    brand.version = (project.brand.version ?? 1) + 1;
+    delete brand.preset; // the colours no longer match the preset the kit started from
+  }
   const errors = validateKind("brand", brand);
   if (errors.length) throw new Error(`Merged brand.json would be invalid:\n  ${errors.join("\n  ")}`);
 
@@ -87,7 +97,7 @@ export function applyStyle(dir, slug, { variant, asPreset, keep = false, dryRun 
   // proposal of style-enhance or other colours.
   const contrast = contrastIssues(brand.colors, brand.captions).map((i) => `${i.token} ${i.ratio.toFixed(1)} < ${i.min}`);
   if (contrast.length && !allowLowContrast) {
-    throw new Error(`Refused: text/background pairs below WCAG AA (${contrast.join(", ")}). Accept the "contrast" proposal (style-enhance.mjs ${dir} ${slug} lists it; then --accept <its number>) or set other colours with style-set.mjs; pass --allow-low-contrast only if the user insists. Nothing was written.`);
+    throw new Error(`Refused: text/background pairs below WCAG AA (${contrast.join(", ")}). Accept the "contrast" proposal (style-enhance.mjs ${dir} ${slug} lists it; then --accept contrast) or set other colours with style-set.mjs; pass --allow-low-contrast only if the user insists. Nothing was written.`);
   }
 
   const info = existsSync(join(sd, "info.json")) ? readJson(join(sd, "info.json")) : {};

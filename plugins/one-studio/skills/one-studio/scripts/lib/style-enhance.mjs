@@ -17,6 +17,7 @@ export const UI_ZONE = { bottom: 0.2, right: 0.12 };
 export const WORDS_PER_SENTENCE = 12;
 export const SERIES_COLOR_MIN_DELTA_E = 8;
 const CAPTION_CHAR_WIDTH = 0.55; // average glyph width in em
+export const MIN_CAPTION_CHARS = 10; // style schema minimum for captions.max_chars
 
 // Everything the rules read, gathered once.
 export function enhanceContext(project, slug) {
@@ -146,7 +147,9 @@ function captionSafeZone(ctx) {
   if (ctx.aspect !== "9:16" && ctx.style.writing?.format !== "short-vertical") return null;
   const cap = ctx.brand.captions ?? {};
   const size = cap.size ?? 44;
-  const maxChars = Math.floor(((1 - 2 * UI_ZONE.right) * 1080) / (CAPTION_CHAR_WIDTH * size));
+  const fitChars = Math.floor(((1 - 2 * UI_ZONE.right) * 1080) / (CAPTION_CHAR_WIDTH * size));
+  // Never below the schema minimum: a larger size than that allows is left to the size field, not to a broken patch.
+  const maxChars = Math.max(MIN_CAPTION_CHARS, fitChars);
   const patch = {};
   const notes = [];
   if ((cap.position ?? "bottom") === "bottom") {
@@ -198,7 +201,11 @@ function variantRule(ctx) {
 
 export const RULES = [contrast, diacritics, tokenGaps, paceVsVoice, captionSafeZone, missingParts, seriesLock, variantRule];
 
-// Proposals that still apply (not rejected before), in a stable order: their position is the number the user picks.
+// Proposals that still apply (not rejected before). Each keeps the number of its rule (position in RULES), so
+// accepting or rejecting one never renumbers the others; a proposal that no longer applies leaves a gap.
 export function proposeEnhancements(ctx) {
-  return RULES.map((rule) => rule(ctx)).filter((p) => p && !ctx.rejected.has(p.id));
+  return RULES.map((rule, i) => {
+    const p = rule(ctx);
+    return p && { ...p, n: i + 1 };
+  }).filter((p) => p && !ctx.rejected.has(p.id));
 }

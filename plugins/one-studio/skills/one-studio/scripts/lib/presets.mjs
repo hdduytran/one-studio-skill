@@ -16,7 +16,7 @@ export const presetCacheDir = () => join(cacheDir(), "presets");
 const pluginPresets = () => readJson(join(TEMPLATE_DIR, "brand-presets.json"));
 
 // Plugin presets plus cached ones. A cached file that is unreadable is skipped (it must not break init);
-// one that reuses a plugin preset's name is an error, because the plugin's preset would be shadowed.
+// one that reuses a plugin preset's name is skipped with a warning (the plugin's preset wins).
 export function loadPresets() {
   const presets = pluginPresets();
   const dir = presetCacheDir();
@@ -24,7 +24,10 @@ export function loadPresets() {
   for (const file of readdirSync(dir).filter((f) => f.endsWith(".json")).sort()) {
     const name = file.slice(0, -5);
     if (!PRESET_NAME_RE.test(name)) continue;
-    if (name in presets) throw new Error(`Cached preset "${name}" (${join(dir, file)}) clashes with a plugin preset; rename or delete that file`);
+    if (name in presets) {
+      console.warn(`Skipped cached preset "${name}" (${join(dir, file)}): the plugin has a preset with that name; rename or delete the file / bỏ qua preset trong cache trùng tên preset của plugin`);
+      continue;
+    }
     let entry;
     try {
       entry = readJson(join(dir, file));

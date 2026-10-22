@@ -48,7 +48,11 @@ function mergeValues(values, path, ties) {
     }
     return Object.keys(out).length ? out : undefined;
   }
-  if (values.every((v) => typeof v === "number")) return median(values);
+  if (values.every((v) => typeof v === "number")) {
+    const m = median(values);
+    // Integer-typed fields (every source holds a whole number) must stay whole.
+    return values.every(Number.isInteger) ? Math.round(m) : m;
+  }
   const v = majority(values);
   if (v === undefined) ties.push(path);
   return v;

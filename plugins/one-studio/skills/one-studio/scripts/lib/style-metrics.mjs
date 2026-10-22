@@ -17,7 +17,7 @@ export function parseFrameMetadata(text) {
   for (const line of text.split("\n")) {
     const f = /^frame:\d+\s+pts:\S+\s+pts_time:(\S+)/.exec(line);
     if (f) {
-      cur = { t: Number(f[1]), score: 0, mafd: 0, cut: false, yavg: NaN, sat: NaN, ylow: NaN, yhigh: NaN, cropW: NaN, cropH: NaN, x: 0 };
+      cur = { t: Number(f[1]), score: 0, mafd: 0, cut: false, yavg: NaN, sat: NaN, ylow: NaN, yhigh: NaN, cropW: NaN, cropH: NaN, cropX: NaN, cropY: NaN, x: 0 };
       frames.push(cur);
       continue;
     }
@@ -33,6 +33,8 @@ export function parseFrameMetadata(text) {
     else if (k === "signalstats.YHIGH") cur.yhigh = num(v);
     else if (k === "cropdetect.w") cur.cropW = num(v);
     else if (k === "cropdetect.h") cur.cropH = num(v);
+    else if (k === "cropdetect.x") cur.cropX = num(v);
+    else if (k === "cropdetect.y") cur.cropY = num(v);
   }
   return frames;
 }
@@ -123,7 +125,12 @@ export function letterbox(frames, scaled) {
   const last = [...frames].reverse().find((f) => Number.isFinite(f.cropW));
   if (!last) return null;
   const bars = last.cropH < scaled.h * 0.94 || last.cropW < scaled.w * 0.94;
-  return { detected: bars, picture_aspect: round(last.cropW / last.cropH, 2) };
+  const out = { detected: bars, picture_aspect: round(last.cropW / last.cropH, 2) };
+  // Picture rectangle as fractions of the frame (x, y, w, h), so any later sampling size can crop to it.
+  if (bars && Number.isFinite(last.cropX) && Number.isFinite(last.cropY)) {
+    out.rect = { x: round(last.cropX / scaled.w), y: round(last.cropY / scaled.h), w: round(last.cropW / scaled.w), h: round(last.cropH / scaled.h) };
+  }
+  return out;
 }
 
 // <= 40 short lines for the reader step to load instead of the whole file.

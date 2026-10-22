@@ -224,3 +224,19 @@ test("style-draft --check reports schema and provenance errors; missing inputs e
   assert.equal(run("style-draft.mjs", dir, "nope").code, 1);
   assert.match(run("style-draft.mjs", dir, "nope", "--check").err, /No style/);
 });
+
+test("draft: without scdet the motion, stagger, sfx and bed fields are guessed, not measured", () => {
+  const measured = map.buildDraft(metricsOf(), {}, { slug: "x" }).style.provenance;
+  assert.equal(measured["brand.motion.ease"].source, "measured");
+  const { style } = map.buildDraft(metricsOf({ unavailable_filters: ["scdet"] }), {}, { slug: "x" });
+  for (const k of ["brand.motion.ease", "brand.motion.stagger", "storyboard.sfx_density", "audio.music.preset"]) {
+    assert.equal(style.provenance[k].source, "guessed", k);
+    assert.match(style.provenance[k].note, /scdet/);
+  }
+  assert.deepEqual(refs.styleErrors(style, { slug: "x" }), []);
+});
+
+test("draft: a reference link with credentials is stored without them", () => {
+  const { style } = map.buildDraft(metricsOf(), { url: "https://me:secret@example.com/v?id=1" }, { slug: "x" });
+  assert.equal(style.reference.url, "https://example.com/v?id=1");
+});

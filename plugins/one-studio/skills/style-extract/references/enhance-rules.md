@@ -1,6 +1,6 @@
 # Enhance rules
 
-`style-enhance.mjs D <slug>` runs these rules on the **effective** style (extracted card, then accepted proposals, then the user's own choices) and prints a numbered list plus `review/style-<slug>-enhance.jpg` (one row per proposal that changes a sample: before | after; the script prints the tile order). Nothing is written until the user accepts: `--accept 1,3` (or `all`), `--reject 2` (never proposed again). The numbers are positions in the list you just printed, so list first, then accept. A field the user locked or set by hand is never proposed again.
+`style-enhance.mjs D <slug>` runs these rules on the **effective** style (extracted card, then accepted proposals, then the user's own choices) and prints a numbered list plus `review/style-<slug>-enhance.jpg` (one row per proposal that changes a sample: before | after; the script prints the tile order). Nothing is written until the user accepts: `--accept 1,3` (or `all`), `--accept contrast,token-gaps` (rule ids work too), `--reject 2` (never proposed again). Each rule keeps its own number (its position among the rules below), so accepting or rejecting one never renumbers the others; the list shows gaps for rules with nothing to propose. List first, then accept, using the numbers or ids you just printed. A field the user locked or set by hand is never proposed again.
 
 Every proposal is a patch marked `guessed` with note `enhance:<rule>`. Accepted patches go to `style.enhance.json` (variants to `variants/<v>.json`, generated scenes to `parts/`); `style.json` is never touched.
 

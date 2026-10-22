@@ -1,6 +1,6 @@
 // style-fetch: range maths, yt-dlp arguments, error classes, consent order, local cut, and a stubbed link download.
 import assert from "node:assert/strict";
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join, resolve } from "node:path";
 import { test } from "node:test";
@@ -10,6 +10,8 @@ const S = "plugins/one-studio/skills/one-studio";
 const yt = await import(`../${S}/scripts/lib/ytdlp.mjs`);
 const { neededTools } = await import(`../${S}/scripts/check-external.mjs`);
 const { loadProject } = await import(`../${S}/scripts/lib/project.mjs`);
+const { fetchStyleSource, removeStaleStaging } = await import(`../${S}/scripts/style-fetch.mjs`);
+const { listStyleSlugs } = await import(`../${S}/scripts/lib/style-refs.mjs`);
 const hasFfmpeg = spawnSync("ffmpeg", ["-version"]).status === 0;
 
 const fetchCli = (env, ...args) => {
@@ -53,7 +55,7 @@ test("buildArgs: sections, no cookies, no shell, url after --", () => {
   for (const f of ["--no-playlist", "--write-info-json", "--write-auto-subs", "--no-cookies-from-browser"]) assert.ok(args.includes(f), f);
   assert.ok(!args.some((a) => a.startsWith("--cookies")));
   assert.deepEqual(args.slice(-2), ["--", "https://youtu.be/x"]);
-  assert.equal(yt.buildArgs({ url: "https://a.b/", dir: "/d", from: 0, to: null })[3], "*0-inf");
+  assert.equal(yt.buildArgs({ url: "https://a.b/", dir: "/d", from: 0, to: null }).find((a) => a.startsWith("*")), "*0-inf");
 });
 
 test("only http(s) links are accepted", () => {
@@ -181,3 +183,74 @@ test("neededTools asks for yt-dlp only while a linked reference has no footage",
 function readdirNames(d) {
   return spawnSync("ls", ["-A", d], { encoding: "utf8" }).stdout.split("\n").filter(Boolean).sort();
 }
+
+test("yt-dlp arguments ignore user config files and escape % in the output path", () => {
+  const args = yt.buildArgs({ url: "https://a.b/v", dir: "/Users/x/100%/proj", from: 0, to: 5 });
+  assert.equal(args[0], "--ignore-config");
+  assert.equal(args[args.indexOf("-o") + 1], "/Users/x/100%%/proj/source.%(ext)s");
+});
+
+test("stripUserinfo drops user:pass@ and keeps path and query", () => {
+  assert.equal(yt.stripUserinfo("https://me:secret@www.youtube.com/watch?v=abc&t=5"), "https://www.youtube.com/watch?v=abc&t=5");
+  assert.equal(yt.stripUserinfo("https://youtu.be/x"), "https://youtu.be/x");
+  assert.equal(yt.filterInfo({ webpage_url: "https://u:p@x.com/v?id=1" }).url, "https://x.com/v?id=1");
+});
+
+const stubBin = (body) => {
+  const bin = join(tmp(), "yt-dlp");
+  writeFileSync(bin, `#!/usr/bin/env node\nconst a = process.argv.slice(2);\nif (a[0] === "--version") process.exit(0);\n${body}\n`);
+  chmodSync(bin, 0o755);
+  return bin;
+};
+
+test("a link with user:pass@ is stored without the credentials", { skip: !hasFfmpeg }, () => {
+  const dir = project({ download: true });
+  const bin = stubBin(`
+const { writeFileSync } = require("node:fs");
+const { spawnSync } = require("node:child_process");
+const out = a[a.indexOf("-o") + 1].replace("%(ext)s", "mp4");
+spawnSync("ffmpeg", ["-nostdin", "-y", "-v", "error", "-f", "lavfi", "-i", "color=c=red:s=320x180:r=10", "-t", "4", "-pix_fmt", "yuv420p", out]);
+writeFileSync(out.slice(0, -4) + ".info.json", JSON.stringify({ title: "Creds", webpage_url: "https://me:secret@example.com/v?id=1" }));
+`);
+  const r = fetchCli({ ONE_STUDIO_YTDLP: bin }, dir, "https://me:secret@example.com/v?id=1", "--to", "0:03");
+  assert.equal(r.code, 0, r.err);
+  const text = readFileSync(join(dir, "style-refs", "creds", "info.json"), "utf8");
+  assert.ok(!text.includes("secret") && !text.includes("me:"), text);
+  assert.equal(JSON.parse(text).url, "https://example.com/v?id=1");
+});
+
+test("a stalled yt-dlp is stopped with a clear error and leaves no staging dir", () => {
+  const dir = project({ download: true });
+  const bin = stubBin("setTimeout(() => {}, 30000);");
+  const prev = process.env.ONE_STUDIO_YTDLP;
+  process.env.ONE_STUDIO_YTDLP = bin;
+  try {
+    assert.throws(() => fetchStyleSource(loadProject(dir), "https://example.com/v", { downloadTimeoutMs: 300 }), /did not finish within/);
+  } finally {
+    if (prev === undefined) delete process.env.ONE_STUDIO_YTDLP;
+    else process.env.ONE_STUDIO_YTDLP = prev;
+  }
+  assert.deepEqual(readdirNames(join(dir, "style-refs")).filter((n) => n.startsWith(".fetch-")), []);
+});
+
+test("ffmpeg run() stops a process that outlives its timeout", async () => {
+  const { run } = await import(`../${S}/scripts/lib/ffmpeg.mjs`);
+  assert.throws(() => run("sleep", ["5"], { timeout: 200 }), /did not finish within/);
+});
+
+test("stale .fetch-<pid> dirs are removed on the next fetch and never listed as styles", () => {
+  const dir = project();
+  const refsDir = join(dir, "style-refs");
+  const dead = join(refsDir, ".fetch-2147483000");
+  const old = join(refsDir, `.fetch-${process.ppid}`);
+  const fresh = join(refsDir, ".fetch-1"); // pid 1 always runs
+  for (const d of [dead, old, fresh]) mkdirSync(d, { recursive: true });
+  const ago = new Date(Date.now() - 2 * 3600_000);
+  utimesSync(old, ago, ago);
+  mkdirSync(join(refsDir, "real-style"));
+  assert.deepEqual(listStyleSlugs(dir), ["real-style"]);
+  assert.deepEqual(removeStaleStaging(refsDir).sort(), [".fetch-2147483000", `.fetch-${process.ppid}`].sort());
+  assert.ok(!existsSync(dead) && !existsSync(old));
+  assert.ok(existsSync(fresh), "a running owner and a recent dir are left alone");
+  assert.ok(existsSync(join(refsDir, "real-style")));
+});

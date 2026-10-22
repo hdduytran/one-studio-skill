@@ -386,7 +386,8 @@ test("enhance --reject is remembered; --accept refuses numbers outside the list;
   const dir = project();
   const n = ids(dir);
   assert.ok(n.includes("missing-parts") && n.includes("variants"));
-  const r = run("style-enhance.mjs", dir, "a", "--reject", String(n.indexOf("variants") + 1));
+  const num = proposals(dir).find((p) => p.id === "variants").n;
+  const r = run("style-enhance.mjs", dir, "a", "--reject", String(num));
   assert.equal(r.code, 0, r.err);
   assert.ok(!ids(dir).includes("variants"));
   assert.deepEqual(readJson(join(dir, "style-refs", "a", "style.enhance.json")).rejected, ["variants"]);
@@ -687,4 +688,112 @@ test("style-compare --variant renders the variant into its own sheet", (t) => {
   assert.equal(r.code, 0, r.err);
   assert.ok(existsSync(join(dir, "review", "style-a-warm-compare.jpg")));
   assert.equal(run("style-compare.mjs", dir, "a", "--variant", "missing", "--offline").code, 1);
+});
+
+// ---- hardening
+
+test("reserved variant names (custom, enhance) and non-kebab names are refused everywhere a variant is taken", () => {
+  const dir = project();
+  for (const v of ["custom", "enhance", "Light", "a/b", "-x"]) {
+    assert.throws(() => layers.assertVariantName(v), /variant/, v);
+    for (const script of ["style-set.mjs", "style-diff.mjs", "style-compare.mjs", "style-editor.mjs", "style-apply.mjs"]) {
+      const extra = script === "style-set.mjs" ? ["colors.accent=#111111"] : [];
+      const r = run(script, dir, "a", "--variant", v, ...extra);
+      assert.equal(r.code, 1, `${script} ${v}`);
+      assert.match(r.err, /variant/, `${script} ${v}`);
+    }
+  }
+  assert.ok(!existsSync(join(dir, "style-refs", "a", "style.custom.json")), "nothing written");
+  assert.ok(!existsSync(join(dir, "style-refs", "a", "variants", "custom.json")));
+  layers.assertVariantName("light");
+  const studio = readJson(join(dir, "studio.json"));
+  studio.story = { style: { slug: "a", variant: "custom" } };
+  writeJson(join(dir, "studio.json"), studio);
+  assert.ok(run("validate.mjs", join(dir, "studio.json")).code !== 0, "studio.json cannot name a reserved variant");
+});
+
+test("slugs are validated before any file is touched: traversal and missing folders are refused", () => {
+  const dir = project();
+  const outside = join(dir, "outside");
+  mkdirSync(join(outside, "frames"), { recursive: true });
+  writeFileSync(join(outside, "frames", "keep.jpg"), "x");
+  writeFileSync(join(outside, "source.mp4"), "x");
+  for (const script of ["style-analyze.mjs", "style-draft.mjs", "style-set.mjs", "style-diff.mjs", "style-enhance.mjs", "style-apply.mjs", "style-compare.mjs", "style-editor.mjs"]) {
+    const r = run(script, dir, "../outside", ...(script === "style-set.mjs" ? ["colors.accent=#111111"] : []));
+    assert.equal(r.code, 1, script);
+    assert.match(r.err, /invalid style slug/, script);
+  }
+  assert.ok(existsSync(join(outside, "frames", "keep.jpg")), "nothing outside style-refs was deleted");
+  assert.ok(!existsSync(join(outside, "metrics.json")));
+  assert.throws(() => refs.styleDir(dir, "../x"), /invalid style slug/);
+  assert.throws(() => refs.existingSlug(dir, "missing"), /No style folder/);
+});
+
+test("layer merges ignore __proto__, constructor and prototype keys", () => {
+  const dir = project();
+  const evil = JSON.parse('{"brand":{"__proto__":{"polluted":"yes"},"constructor":{"prototype":{"polluted":"yes"}},"colors":{"__proto__":{"polluted":"yes"},"accent":"#111111"}}}');
+  const out = layers.applyLayer(card("a"), evil);
+  assert.equal(out.brand.colors.accent, "#111111");
+  assert.equal({}.polluted, undefined);
+  assert.equal(Object.prototype.polluted, undefined);
+  assert.equal(Object.hasOwn(out.brand, "constructor"), false);
+  const dst = layers.mergeLayerInto({}, evil);
+  assert.equal({}.polluted, undefined);
+  assert.equal(dst.brand.colors.accent, "#111111");
+  assert.throws(() => layers.setPath({}, "brand.__proto__.x", 1), /invalid field/);
+  assert.equal({}.x, undefined);
+  writeJson(custom(dir), JSON.parse('{"brand":{"__proto__":{"polluted":"yes"},"colors":{"accent":"#222222"}},"provenance":{"brand.colors.accent":{"source":"seen"}}}'));
+  assert.equal(effective(dir).brand.colors.accent, "#222222");
+  assert.equal({}.polluted, undefined);
+});
+
+test("enhance numbers stay put: accepting or rejecting one never renumbers the others; ids work like numbers", () => {
+  const style = card("a");
+  style.brand.colors = { bg: "#101820", fg: "#555555", primary: "#e30613" };
+  const dir = project(style);
+  const before = proposals(dir);
+  const byId = Object.fromEntries(before.map((p) => [p.id, p.n]));
+  assert.ok(byId.contrast && byId["token-gaps"] && byId.variants);
+  assert.deepEqual(before.map((p) => p.n), [...before.map((p) => p.n)].sort((a, b) => a - b));
+  // accept two in a row by their listed numbers
+  const first = run("style-enhance.mjs", dir, "a", "--accept", String(byId.contrast));
+  assert.equal(first.code, 0, first.err);
+  const after = proposals(dir);
+  assert.ok(!after.some((p) => p.id === "contrast"));
+  for (const p of after) assert.equal(p.n, byId[p.id], `${p.id} keeps its number`);
+  const second = run("style-enhance.mjs", dir, "a", "--accept", String(byId["token-gaps"]));
+  assert.equal(second.code, 0, second.err);
+  assert.ok(readJson(join(dir, "style-refs", "a", "style.enhance.json")).applied.map((a) => a.id).join() === "contrast,token-gaps");
+  // ids, several at once, and a reject by id
+  const rej = run("style-enhance.mjs", dir, "a", "--reject", "variants");
+  assert.equal(rej.code, 0, rej.err);
+  assert.deepEqual(readJson(join(dir, "style-refs", "a", "style.enhance.json")).rejected, ["variants"]);
+  const dir2 = project(style);
+  const both = run("style-enhance.mjs", dir2, "a", "--accept", "contrast,token-gaps");
+  assert.equal(both.code, 0, both.err);
+  assert.deepEqual(readJson(join(dir2, "style-refs", "a", "style.enhance.json")).applied.map((a) => a.id), ["contrast", "token-gaps"]);
+  // a number or id that is not listed is refused with the valid ones named
+  const bad = run("style-enhance.mjs", dir2, "a", "--accept", "contrast");
+  assert.equal(bad.code, 1);
+  assert.match(bad.err, /pick from the listed proposals/);
+  assert.equal(run("style-enhance.mjs", dir2, "a", "--accept", "nope").code, 1);
+  const listing = run("style-enhance.mjs", dir, "a", "--no-sheet");
+  assert.equal(listing.code, 0, listing.err);
+  assert.ok(!listing.out.includes("[contrast]") && !listing.out.includes("[variants]"), "accepted and rejected rules are not listed again");
+});
+
+test("rule caption-safe-zone never proposes max_chars below the schema minimum", () => {
+  const big = card("a");
+  big.brand.captions = { position: "bottom", size: 200, max_chars: 40 };
+  const dir = project(big, ["--aspect", "9:16"]);
+  const [p] = proposals(dir).filter((x) => x.id === "caption-safe-zone");
+  assert.ok(p.patch.brand.captions.max_chars >= 10, String(p.patch.brand.captions.max_chars));
+  accept(dir, "caption-safe-zone");
+  assert.deepEqual(refs.styleErrors(effective(dir), { slug: "a" }), []);
+  // already at the minimum: only the position is proposed, max_chars is left alone
+  const tight = card("a");
+  tight.brand.captions = { position: "bottom", size: 200, max_chars: 10 };
+  const [q] = proposals(project(tight, ["--aspect", "9:16"])).filter((x) => x.id === "caption-safe-zone");
+  assert.equal(q.patch.brand.captions.max_chars, undefined);
+  assert.equal(q.patch.brand.captions.position, "middle");
 });

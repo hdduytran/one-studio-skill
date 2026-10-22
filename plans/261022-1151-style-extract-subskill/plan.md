@@ -1,6 +1,6 @@
 # Plan: subskill `style-extract` — lấy style từ video có sẵn
 
-Status: draft · Created: 2026-10-22 · Research: [researcher-261022-1151-video-style-extract-subskill.md](../reports/researcher-261022-1151-video-style-extract-subskill.md)
+Status: implemented (branch feat/style-extract) · Created: 2026-10-22 · Research: [researcher-261022-1151-video-style-extract-subskill.md](../reports/researcher-261022-1151-video-style-extract-subskill.md)
 
 ## Outcome
 

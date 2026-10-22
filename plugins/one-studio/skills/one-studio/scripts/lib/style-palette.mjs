@@ -20,16 +20,24 @@ function rng(seed) {
 
 // Pixels of one raw rgb24 frame that carry style (not overlays): drops the caption band at the bottom
 // and, for TikTok, the four corners where the moving watermark sits. `border` marks the outer 10% ring.
-export function framePixels(buf, w, h, { platform = "other", captionBand = 0.18 } = {}) {
+// `rect` ({x, y, w, h} as fractions of the frame, the letterbox picture area) keeps letterbox bars out of the
+// sample: pixels outside it are skipped, and the caption band and border ring are measured inside it.
+export function framePixels(buf, w, h, { platform = "other", captionBand = 0.18, rect = null } = {}) {
   const out = [];
-  const cornerW = Math.round(w * 0.3);
-  const cornerH = Math.round(h * 0.14);
-  const maxY = Math.floor(h * (1 - captionBand));
-  for (let y = 0; y < maxY; y++) {
-    for (let x = 0; x < w; x++) {
-      if (platform === "tiktok" && (x < cornerW || x >= w - cornerW) && (y < cornerH || y >= maxY - cornerH)) continue;
+  const x0 = rect ? Math.max(0, Math.round(rect.x * w)) : 0;
+  const y0 = rect ? Math.max(0, Math.round(rect.y * h)) : 0;
+  const x1 = rect ? Math.min(w, Math.round((rect.x + rect.w) * w)) : w;
+  const y1 = rect ? Math.min(h, Math.round((rect.y + rect.h) * h)) : h;
+  const rw = x1 - x0;
+  const rh = y1 - y0;
+  const cornerW = Math.round(rw * 0.3);
+  const cornerH = Math.round(rh * 0.14);
+  const maxY = y0 + Math.floor(rh * (1 - captionBand));
+  for (let y = y0; y < maxY; y++) {
+    for (let x = x0; x < x1; x++) {
+      if (platform === "tiktok" && (x - x0 < cornerW || x1 - x <= cornerW) && (y - y0 < cornerH || y >= maxY - cornerH)) continue;
       const i = (y * w + x) * 3;
-      const border = x < w * 0.1 || x >= w * 0.9 || y < h * 0.1 || y >= maxY - h * 0.1;
+      const border = x - x0 < rw * 0.1 || x1 - x <= rw * 0.1 || y - y0 < rh * 0.1 || y >= maxY - rh * 0.1;
       out.push({ lab: rgbToOklab([buf[i], buf[i + 1], buf[i + 2]]), border });
     }
   }
