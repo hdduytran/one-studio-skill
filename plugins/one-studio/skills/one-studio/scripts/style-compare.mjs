@@ -1,31 +1,20 @@
 #!/usr/bin/env node
 // Three sample scenes (title, chart, caption) rendered in an extracted style, under the reference's own frames.
 //   node style-compare.mjs <project-dir> <slug> [--variant v] [--ratio 9:16] [--offline]
-//        → review/style-<slug>-compare.jpg: row 1 reference frames · row 2 samples · row 3 colour tokens
+//        → review/style-<slug>[-<variant>]-compare.jpg: row 1 reference frames · row 2 samples · row 3 colour tokens
 // The style is merged over the project's brand in a staging copy (.one-studio/styles/<slug>/); brand.json, the
 // project's assets, scenes and approvals stay untouched. No video is rendered. Use before style-apply.
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from "node:fs";
+// The style is the effective one: extracted card <- enhance <- your choices <- variant.
+import { existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { join, relative } from "node:path";
-import { ASPECTS, TEMPLATE_DIR, isMain, loadProject, parseArgs, readJson } from "./lib/project.mjs";
+import { ASPECTS, isMain, loadProject, parseArgs, readJson } from "./lib/project.mjs";
 import { mergeBrandPatch, resolveStyle, styleDir } from "./lib/style-refs.mjs";
-import { buildIndex } from "./lib/scenes.mjs";
 import { run } from "./lib/ffmpeg.mjs";
 import { hexToRgb, rgbToHex } from "./lib/color.mjs";
-import { snapshotStills, stageBrand } from "./lib/stage-brand.mjs";
+import { SAMPLES, renderSamples } from "./lib/style-samples.mjs";
 import { contactSheet } from "./keyframe-stills.mjs";
 
-const SAMPLES = [{ id: "title", label: "title" }, { id: "data", label: "chart" }, { id: "caption", label: "caption" }];
-const SAMPLE_SECONDS = 3.5;
-const SAMPLE_DIR = join(TEMPLATE_DIR, "..", "..", "style-extract", "templates", "samples");
 const TOKENS = ["bg", "fg", "primary", "secondary", "accent", "muted"];
-
-// _head.html opens the scene root; the sample file is the rest of the document.
-function sampleHtml(name, { id, width, height, lang, brand }) {
-  const tr = brand.transitions ?? {};
-  const vars = { id, type: "text", lang, width, height, duration: SAMPLE_SECONDS, extra_head: "", transition_in: tr.default ?? "fade", transition_out: tr.default ?? "fade", transition_duration: tr.duration ?? 0.4 };
-  const html = readFileSync(join(TEMPLATE_DIR, "scenes", "_head.html"), "utf8") + readFileSync(join(SAMPLE_DIR, `${name}.html`), "utf8");
-  return html.replace(/\{\{(\w+)\}\}/g, (m, k) => (k in vars ? String(vars[k]) : m));
-}
 
 // Aspect of the reference: --ratio, else the analysed video's (when it is one we can lay out), else the project's.
 function pickRatio(project, sd, requested) {
@@ -55,7 +44,7 @@ function tokenStrips(colors, ratio, dir) {
 }
 
 // Up to three reference frames spread over frames/ (kept only until style-apply cleans up).
-function referenceFrames(sd) {
+export function referenceFrames(sd) {
   const dir = join(sd, "frames");
   const all = existsSync(dir) ? readdirSync(dir).filter((f) => /^frame-\d+\.jpg$/.test(f)).sort() : [];
   if (all.length <= 3) return all.map((f) => join(dir, f));
@@ -70,17 +59,10 @@ export function compareStyle(dir, slug, { variant, ratio, offline = false } = {}
   const aspect = pickRatio(project, sd, ratio);
   const { width, height } = ASPECTS[aspect];
   const brand = { ...mergeBrandPatch(project.brand, style.brand), name: `${project.brand.name} · ${slug}` };
-  const lang = project.studio.meta.language;
   const root = join(project.root, ".one-studio", "styles", slug);
   try {
-    const scenes = SAMPLES.map((s) => ({ id: s.id, html: sampleHtml(s.id, { id: s.id, width, height, lang, brand }) }));
-    const { warning } = stageBrand(project, { root, brand, scenes, offline, label: slug });
-    // The staged folder is its own tiny project: only its format, language and scene list matter to the index.
-    const mini = { root, studio: { format: { width, height, fps: 30 }, meta: { language: lang } }, storyboard: { scenes: SAMPLES.map((s) => ({ id: s.id, type: "text", duration: SAMPLE_SECONDS })) } };
-    const index = buildIndex(mini, { outDir: root });
-    const times = SAMPLES.map((s) => Math.round((index.starts[s.id].start + SAMPLE_SECONDS * 0.75) * 100) / 100);
-    const stills = snapshotStills(project, root, times);
-    if (stills.length !== SAMPLES.length) throw new Error(`expected ${SAMPLES.length} stills, got ${stills.length}`);
+    const { stills: byId, times, warning } = renderSamples(project, brand, { root, ratio: aspect, offline, label: slug });
+    const stills = SAMPLES.map((x) => byId[x.id]);
     const refs = referenceFrames(sd);
     const strips = tokenStrips(brand.colors, aspect, root);
     const rows = [];
@@ -88,7 +70,7 @@ export function compareStyle(dir, slug, { variant, ratio, offline = false } = {}
     rows.push({ id: "samples", times: times, stills, labels: SAMPLES.map((s) => s.label) });
     rows.push({ id: "tokens", times: strips.map(() => ""), stills: strips.map((s) => s.file), labels: strips.map((s) => s.label) });
     mkdirSync(join(project.root, "review"), { recursive: true });
-    const sheet = contactSheet(rows, join(project.root, "review", `style-${slug}-compare.jpg`), { tileWidth: width >= height ? 400 : 240 });
+    const sheet = contactSheet(rows, join(project.root, "review", `style-${slug}${variant ? `-${variant}` : ""}-compare.jpg`), { tileWidth: width >= height ? 400 : 240 });
     const fonts = Object.fromEntries(["heading", "body", "mono"].filter((k) => brand.typography[k]).map((k) => [k, brand.typography[k].family]));
     return { sheet, ratio: aspect, rows: rows.map((r) => ({ id: r.id, tiles: r.labels })), fonts, hasReference: refs.length > 0, warning };
   } finally {

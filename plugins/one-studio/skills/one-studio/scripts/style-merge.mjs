@@ -6,12 +6,14 @@
 //   other values       the majority value; a tie leaves the field out (absent, never null): the card then
 //                      lists it as still open for Claude to choose with the user
 //   do_not_copy        union
+// Sources are read through their layers (extracted <- enhance <- your choices), so locked and custom values count.
 // Writes style-refs/<slug>/{style.json, metrics.json, sources.json}. The card's `reference` stays one object
 // (the schema's shape: that of the first source); every source's reference is kept in sources.json.
 import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { isMain, loadProject, now, parseArgs, readJson, writeJson } from "./lib/project.mjs";
 import { ensureGitignore, leafPaths, resolveStyle, styleDir, styleErrors } from "./lib/style-refs.mjs";
+import { keptByChoice } from "./lib/style-layers.mjs";
 import { deltaE2000, hexToOklch } from "./lib/color.mjs";
 import { assignColorRoles } from "./lib/style-color-roles.mjs";
 
@@ -102,7 +104,9 @@ export function mergeStyles(project, slugs, as) {
     style.provenance[path] = { source, note: colour ? `shared by at least ${MIN_SOURCES_FOR_COLOUR} of: ${names}` : `merged from ${names}` };
   }
   const metrics = { schema_version: 1, generated_at: now(), merged_from: slugs, format: sources[0].metrics.format, color: { palette } };
-  return { style, metrics, refs: sources.map((s) => ({ slug: s.slug, reference: s.style.reference })), ties, dropped, notes: roles.notes };
+  // Each source enters as its effective style, so what the user set or locked there is part of the blend.
+  const carried = sources.flatMap((s) => keptByChoice(project, s.slug).map((p) => `${p} (${s.slug})`));
+  return { style, metrics, refs: sources.map((s) => ({ slug: s.slug, reference: s.style.reference })), ties, dropped, notes: roles.notes, carried };
 }
 
 export function writeMerged(dir, slugs, as) {
@@ -134,6 +138,7 @@ if (isMain(import.meta.url)) {
     console.log(`✓ ${slugs.join(" + ")} → ${r.dir}/style.json`);
     console.log(`  colours: ${Object.keys(r.style.brand.colors).length} role(s) from ${r.metrics.color.palette.length} shared cluster(s); ${r.dropped} cluster(s) seen in one source only were dropped`);
     for (const n of r.notes) console.log(`  · ${n}`);
+    if (r.carried.length) console.log(`  kept by your choice (giữ theo lựa chọn của bạn), blended in: ${r.carried.join(", ")}`);
     if (r.ties.length) console.log(`  left open (sources disagree, no majority): ${r.ties.join(", ")}`);
     console.log("Next: style-draft.mjs <dir> <slug> --check, then style-compare.mjs.");
   } catch (err) {

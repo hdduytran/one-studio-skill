@@ -159,9 +159,9 @@ test("reapproval count: approved scenes lose their approval when the version bum
   assert.deepEqual([r.approved, r.reapprove], [1, 1]);
 });
 
-test("variants are refused until customize exists", () => {
+test("a variant that does not exist is refused", () => {
   const dir = project();
-  assert.throws(() => apply.applyStyle(dir, "a", { variant: "light" }), /variants arrive with customize/);
+  assert.throws(() => apply.applyStyle(dir, "a", { variant: "light" }), /No variant "light"/);
 });
 
 // ---- preset cache

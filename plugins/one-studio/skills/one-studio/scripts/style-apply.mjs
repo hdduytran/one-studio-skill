@@ -14,6 +14,7 @@ import { isMain, loadProject, parseArgs, readJson, validateKind, writeJson } fro
 import { mergeBrandPatch, resolveStyle, styleDir } from "./lib/style-refs.mjs";
 import { PRESET_EXTRA_SECTIONS, assertCachePresetName, loadPresets, saveCachePreset } from "./lib/presets.mjs";
 import { sceneHash, sceneSourceExists } from "./lib/hash.mjs";
+import { contrastIssues } from "./lib/style-contrast.mjs";
 
 // Approved scenes whose approval no longer matches once `brand` is the project's brand (the same
 // comparison render-changed-scenes makes, evaluated for the new brand version).
@@ -82,8 +83,13 @@ export function applyStyle(dir, slug, { variant, asPreset, keep = false, dryRun 
   if (studioErrors.length) throw new Error(`studio.json would be invalid:\n  ${studioErrors.join("\n  ")}`);
 
   const info = existsSync(join(sd, "info.json")) ? readJson(join(sd, "info.json")) : {};
-  const hints = { slug, ...(variant && { variant }), storyboard: style.storyboard ?? {}, audio: style.audio ?? {}, writing: style.writing ?? {}, do_not_copy: style.do_not_copy ?? [] };
-  const result = { brandPath: project.brandPath, version: brand.version, ...reapprovalCount(project, brand), filled, series: project.studio.meta.series ?? null, hintsFile: join(sd, "hints.json"), preset: null, removed: [], dryRun };
+  // Scene templates style-enhance generated (lower third, intro, outro, thumbnail), for gate 3 to offer.
+  const partsDir = join(sd, "parts");
+  const parts = existsSync(partsDir) ? readdirSync(partsDir).filter((f) => f.endsWith(".html")).sort() : [];
+  const hints = { slug, ...(variant && { variant }), storyboard: style.storyboard ?? {}, audio: style.audio ?? {}, writing: style.writing ?? {}, do_not_copy: style.do_not_copy ?? [], ...(parts.length && { parts }) };
+  const result = { brandPath: project.brandPath, version: brand.version, ...reapprovalCount(project, brand), filled, series: project.studio.meta.series ?? null, hintsFile: join(sd, "hints.json"), preset: null, removed: [], dryRun,
+    // Pairs under WCAG AA once applied: a warning only, the user may have chosen them (style-enhance proposes the fix).
+    contrast: contrastIssues(brand.colors, brand.captions).map((i) => `${i.token} ${i.ratio.toFixed(1)} < ${i.min}`) };
   if (dryRun) return result;
 
   if (asPreset) result.preset = saveCachePreset(asPreset, presetEntry(style, sd));
@@ -106,6 +112,7 @@ if (isMain(import.meta.url)) {
     const r = applyStyle(dir, slug, { variant: args.variant, asPreset: args["as-preset"], keep: args.keep, dryRun: args["dry-run"] });
     console.log(`${r.dryRun ? "Would apply" : "✓ Applied"} ${slug} → ${r.brandPath} (version ${r.version})${r.series ? ` — shared by series ${r.series}` : ""}`);
     console.log(`  ${r.reapprove} of ${r.scenes} scene(s) need re-approval (${r.approved} approved now); every scene hash changes with the brand version`);
+    if (r.contrast.length) console.log(`  ⚠ below WCAG AA: ${r.contrast.join(", ")} (style-enhance.mjs proposes a fix)`);
     if (r.filled.length) console.log(`  story ${r.filled.join(", ")} filled from the style (they were empty)`);
     if (r.dryRun) process.exit(0);
     console.log(`  hints: ${r.hintsFile} (read at gates 3 and 7)`);

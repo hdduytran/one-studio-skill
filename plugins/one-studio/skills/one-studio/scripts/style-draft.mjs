@@ -2,15 +2,18 @@
 // Draft style-refs/<slug>/style.json from metrics.json, or list what is still open.
 //   node style-draft.mjs <project-dir> <slug> [--force]   write the draft (refuses to overwrite an existing style.json)
 //   node style-draft.mjs <project-dir> <slug> --check     validate style.json and list fields still missing or guessed
+// A re-extraction (--force) writes only style.json: fields in style.custom.json or locked are kept ("kept by your choice").
 // The draft carries only what the numbers support. Fields that need eyes (surface, fonts, captions, visual
 // modes, tone, hook, do_not_copy) are left out; read the sheets, fill them with source "seen", then run --check.
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { isMain, loadProject, parseArgs, readJson, writeJson } from "./lib/project.mjs";
 import { styleDir, styleErrors } from "./lib/style-refs.mjs";
+import { keptByChoice } from "./lib/style-layers.mjs";
 import { buildDraft, remainingFields } from "./lib/style-map.mjs";
 
-// Writes the draft and returns { file, style, notes }.
+// Writes the draft and returns { file, style, notes, kept }. Only style.json is written: what the user set
+// (style.custom.json, variants) or locked still wins in the effective style; `kept` lists those fields.
 export function draft(dir, slug, { force = false } = {}) {
   const sd = styleDir(dir, slug);
   const metricsFile = join(sd, "metrics.json");
@@ -22,7 +25,7 @@ export function draft(dir, slug, { force = false } = {}) {
   const errors = styleErrors(style, { slug });
   if (errors.length) throw new Error(`Draft is invalid (bug):\n  ${errors.join("\n  ")}`);
   writeJson(out, style);
-  return { file: out, style, notes };
+  return { file: out, style, notes, kept: keptByChoice(dir, slug) };
 }
 
 // Validates style.json (against the project brand when the folder is a project) -> { errors, open }.
@@ -56,10 +59,11 @@ if (isMain(import.meta.url)) {
       console.log(errors.length ? `${errors.length} error(s)` : open.length ? `Valid; ${open.length} field(s) still to fill or confirm` : "Valid; nothing left to fill");
       process.exit(errors.length ? 1 : 0);
     }
-    const { file, style, notes } = draft(dir, slug, { force: args.force });
+    const { file, style, notes, kept } = draft(dir, slug, { force: args.force });
     const fields = Object.keys(style.provenance).length;
     console.log(`Draft: ${file} (${fields} fields from measurements)`);
     for (const n of notes) console.log(`· ${n}`);
+    if (kept.length) console.log(`kept by your choice (giữ theo lựa chọn của bạn): ${kept.join(", ")}`);
     for (const o of check(dir, slug).open) console.log(line(o));
   } catch (err) {
     console.error(err.message);

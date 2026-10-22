@@ -5,6 +5,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { readJson, validateKind } from "./project.mjs";
+import { effectiveStyle } from "./style-layers.mjs";
 
 export const STYLE_REFS_DIR = "style-refs";
 // Reference footage must never be committed or shipped: only the derived cards are kept.
@@ -105,22 +106,33 @@ export function loadStyle(project, slug) {
   return style;
 }
 
-// The one place compare, apply and merge read a style from: today style.json, later the layered
-// style.json <- enhance <- custom <- variants/<v>.json. `variant` is rejected until variants exist.
+// The one place compare, apply and merge read a style from: the layered
+// style.json <- enhance <- custom <- variants/<v>.json (see style-layers.mjs).
 export function resolveStyle(project, slug, { variant } = {}) {
-  if (variant) throw new Error(`variants arrive with customize; "${variant}" cannot be used yet`);
-  return loadStyle(project, slug);
+  return effectiveStyle(project, slug, variant);
 }
 
-// validate.mjs hook: one result per style-refs/<slug>/style.json (none when the folder is absent).
+// validate.mjs hook: one result per style-refs/<slug>/style.json (none when the folder is absent). When layer
+// files exist the merged result is checked too: the extracted card, then each variant on top of it.
 export function styleProjectResults(project) {
   return listStyleSlugs(project)
     .filter((slug) => existsSync(join(styleDir(project, slug), "style.json")))
     .map((slug) => {
-      const file = join(styleDir(project, slug), "style.json");
+      const sd = styleDir(project, slug);
+      const file = join(sd, "style.json");
       let errors;
       try {
         errors = styleErrors(readJson(file), { slug, brand: project.brand });
+        if (!errors.length) {
+          const variants = existsSync(join(sd, "variants")) ? readdirSync(join(sd, "variants")).filter((f) => f.endsWith(".json")).map((f) => f.slice(0, -5)) : [];
+          for (const v of [undefined, ...variants]) {
+            try {
+              effectiveStyle(project, slug, v);
+            } catch (err) {
+              errors.push(err.message);
+            }
+          }
+        }
       } catch (err) {
         errors = [err.message];
       }
