@@ -39,7 +39,7 @@ function stageScenes(project, brand, root, { ratio, offline }) {
   const { width, height } = ASPECTS[ratio];
   const lang = project.studio.meta.language;
   const scenes = SAMPLES.map((s) => ({ id: s.id, html: sampleHtml(s.id, { width, height, lang, brand }).replace('<script src="../assets/brand.js"></script>', '<script src="../assets/brand.js"></script>\n<script src="../editor-bridge.js"></script>') }));
-  const { warning } = stageBrand(project, { root, brand, scenes, offline, label: "editor" });
+  const { warning } = stageBrand(project, { root, brand, scenes, offline, label: "editor", aspect: ratio });
   copyFileSync(join(TEMPLATES, "editor-bridge.js"), join(root, "editor-bridge.js"));
   return warning;
 }

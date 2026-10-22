@@ -1,4 +1,4 @@
-// Assign brand colour roles (bg/fg/primary/secondary/accent/muted) to the palette clusters of a metrics.json.
+// Assign brand colour roles (bg/fg/surface/primary/secondary/accent/muted) to the palette clusters of a metrics.json.
 // Pure and deterministic. A role with no suitable cluster is left out and reported in `notes`, never invented
 // from thin air (the one exception is fg on a near-monochrome palette: black or white, marked guessed).
 import { contrastRatio, deltaE2000 } from "./color.mjs";
@@ -8,6 +8,10 @@ export const FG_MIN_CONTRAST = 4.5; // WCAG AA body text
 export const ACCENT_MIN_CHROMA = 0.08; // OKLCH C below this reads as grey
 export const MUTED_MAX_CHROMA = 0.06;
 export const DISTINCT_DELTA_E = 15; // accents must differ from each other and from bg/fg by at least this
+// Surface = card / panel fill: a big near-neutral area that text sits on, too close to bg to be text itself.
+export const SURFACE_MIN_WEIGHT = 0.05;
+export const SURFACE_MAX_BG_CONTRAST = 3;
+export const SURFACE_MIN_DELTA_E = 5;
 const FG_FALLBACK = { dark: "#f5f5f5", light: "#111111" };
 
 // palette: metrics.color.palette = [{hex, weight, L, C, h, bg}]
@@ -38,6 +42,16 @@ export function assignColorRoles(palette = []) {
   }
 
   const taken = [bg.hex, colors.fg];
+  // Before the accents: a cream card on a lavender page would otherwise become "primary" and be darkened as text.
+  const surface = others
+    .filter((c) => c !== fg && c.weight >= SURFACE_MIN_WEIGHT && c.C < ACCENT_MIN_CHROMA)
+    .filter((c) => contrastRatio(c.hex, bg.hex) < SURFACE_MAX_BG_CONTRAST && deltaE2000(c.hex, bg.hex) >= SURFACE_MIN_DELTA_E)
+    .filter((c) => contrastRatio(colors.fg, c.hex) >= FG_MIN_CONTRAST)
+    .sort((a, b) => b.weight - a.weight || (a.hex < b.hex ? -1 : 1))[0];
+  if (surface) {
+    set("surface", surface.hex, "measured", "large near-neutral area close to bg that text reads on (cards, panels)");
+    taken.push(surface.hex);
+  }
   const distinct = (hex) => taken.every((t) => deltaE2000(hex, t) >= DISTINCT_DELTA_E);
   const accents = others
     .filter((c) => c !== fg && c.C >= ACCENT_MIN_CHROMA)

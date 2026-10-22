@@ -57,10 +57,22 @@ export function sceneSources(project, scene) {
   return [];
 }
 
-// <style data-ratio="9:16,4:5"> blocks apply only to those aspect ratios (os.js disables them elsewhere),
-// so they are hashed only for those ratios: tuning the portrait layout never re-opens the 16:9 scene.
+// <style data-ratio="9:16,4:5"> blocks apply only to those aspect ratios, so they are hashed only for those
+// ratios: tuning the portrait layout never re-opens the 16:9 scene.
 // The block's own line goes with it (indent + newline), so adding one leaves other ratios' text identical.
 const RATIO_STYLE_RE = /[ \t]*<style\b[^>]*\bdata-ratio\s*=\s*["']([^"']+)["'][^>]*>[\s\S]*?<\/style>[ \t]*\n?/gi;
+
+// HyperFrames merges adjacent <style> blocks when it loads a composition, which drops data-ratio, so os.js
+// cannot switch the block off at runtime. Every snapshot/render input is therefore staged per ratio with the
+// other ratios' blocks removed (stripRatioStyles).
+// Projects created before that fix (no studio.json → render.ratio_stage) may hold stills and clips that show the
+// leak: there, scenes with ratio blocks carry RATIO_STAGE_VERSION in their hash so they are made again. Projects
+// created after it never get the key, so adding a ratio block keeps the main ratio's approval and clips.
+export const RATIO_STAGE_VERSION = 1;
+const stagedProject = (project) => (project.studio.render?.ratio_stage ?? 0) >= RATIO_STAGE_VERSION;
+export const hasRatioStyles = (html) => html.search(RATIO_STYLE_RE) >= 0;
+export const stripRatioStyles = (html, aspect) =>
+  html.replace(RATIO_STYLE_RE, (m, list) => (list.split(",").map((r) => r.trim()).includes(aspect) ? m : ""));
 // Written by build-audio / sync-lines from the VO timings.
 export const LINES_BLOCK_RE = /<script\b[^>]*\bid\s*=\s*["']os-lines["'][^>]*>[\s\S]*?<\/script>\n?/i;
 
@@ -68,7 +80,7 @@ export const LINES_BLOCK_RE = /<script\b[^>]*\bid\s*=\s*["']os-lines["'][^>]*>[\
 // (scene length, VO line timings): used by the keyframe/build gates, which must not re-open when the
 // VO stretches a scene (build-audio keeps the per-scene approvals for exactly that change).
 export function sceneText(html, { aspect, layoutOnly = false } = {}) {
-  let t = html.replace(RATIO_STYLE_RE, (m, list) => (list.split(",").map((r) => r.trim()).includes(aspect) ? m : ""));
+  let t = stripRatioStyles(html, aspect);
   if (layoutOnly) {
     t = t
       .replace(/data-duration="[\d.]+"/g, 'data-duration=""')
@@ -88,10 +100,12 @@ export function sceneHash(project, scene, { aspect = project.studio.format.aspec
   const { width, height, fps } = project.studio.format;
   const entry = mainFile(project, scene, engine);
   const files = {};
+  let ratioStage;
   for (const f of sceneSources(project, scene)) {
     let h = fileHash(f);
     if (h && f === entry) {
       const html = readFileSync(f, "utf8");
+      if (!stagedProject(project) && hasRatioStyles(html)) ratioStage = RATIO_STAGE_VERSION;
       const text = sceneText(html, { aspect, layoutOnly });
       // Unchanged text keeps the plain file hash, so projects hashed by older versions stay valid.
       if (text !== html) h = sha256(text);
@@ -105,6 +119,8 @@ export function sceneHash(project, scene, { aspect = project.studio.format.aspec
     format: { width, height, fps },
     brand: project.brand?.version ?? null,
     files,
+    // Only for scenes with ratio blocks in older projects (undefined is dropped by JSON.stringify).
+    ratioStage,
     // Type-specific inputs that live in the storyboard rather than in files.
     extra: engine === "hyperframes" ? null : { type: scene.type, character: scene.character ?? null, three: scene.three ?? null, duration: layoutOnly ? null : effectiveDuration(project, scene) },
   };

@@ -36,19 +36,45 @@ export function solidHex(value, over = "#000000") {
   return rgbToHex(rgb.map((c, i) => c * alpha + back[i] * (1 - alpha)));
 }
 
-// -> [{ token, fg, bg, ratio, min }] for pairs under their minimum. `token` is the colour to change.
+// Text that sits on cards: checked against colors.surface when the brand has one. The surface itself is a
+// fill, never text, so it is never the token to change.
+export const SURFACE_PAIRS = [
+  { fg: "fg", min: AA_TEXT },
+  { fg: "muted", min: AA_TEXT },
+];
+
+// -> [{ token, fg, bg, on, ratio, min }] for pairs under their minimum. `token` is the colour to change,
+// `on` is "bg" or "surface" (what it was checked against).
 export function contrastIssues(colors, captions = {}) {
   const issues = [];
   const bg = solidHex(colors.bg);
   if (!bg) return issues;
   for (const { fg, min } of SAMPLE_PAIRS) {
     const hex = solidHex(colors[fg], bg);
-    if (hex && contrastRatio(hex, bg) < min) issues.push({ token: `colors.${fg}`, fg: colors[fg], bg, ratio: contrastRatio(hex, bg), min });
+    if (hex && contrastRatio(hex, bg) < min) issues.push({ token: `colors.${fg}`, fg: colors[fg], bg, on: "bg", ratio: contrastRatio(hex, bg), min });
+  }
+  const surface = colors.surface ? solidHex(colors.surface, bg) : null;
+  if (surface) {
+    for (const { fg, min } of SURFACE_PAIRS) {
+      const hex = solidHex(colors[fg], surface);
+      if (hex && contrastRatio(hex, surface) < min) issues.push({ token: `colors.${fg}`, fg: colors[fg], bg: surface, on: "surface", ratio: contrastRatio(hex, surface), min });
+    }
   }
   const box = solidHex(captions.background ?? DEFAULT_CAPTION.background, bg);
   const text = solidHex(captions.color ?? DEFAULT_CAPTION.color, box ?? bg);
   if (box && text && contrastRatio(text, box) < AA_TEXT) issues.push({ token: "captions.color", fg: captions.color ?? DEFAULT_CAPTION.color, bg: box, ratio: contrastRatio(text, box), min: AA_TEXT });
   return issues;
+}
+
+// One colour that reaches `min` on every background in `bgs` (page and surface): the fix for the hardest
+// background first, then the others; falls back to the fix for the hardest one.
+export function fixContrastOn(fg, bgs, min) {
+  const worst = [...bgs].sort((a, b) => contrastRatio(fg, a) - contrastRatio(fg, b))[0];
+  for (const bg of [worst, ...bgs.filter((b) => b !== worst)]) {
+    const hex = fixContrast(fg, bg, min);
+    if (bgs.every((b) => contrastRatio(hex, b) >= min)) return hex;
+  }
+  return fixContrast(fg, worst, min);
 }
 
 // Smallest lightness move (OKLCH) that reaches `min` on `bg`, keeping hue; chroma is reduced only when the

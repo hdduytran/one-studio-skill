@@ -130,3 +130,59 @@ test("tts: API key from env, probe", async () => {
     mock.close();
   }
 });
+
+test("speaking rate: measured per voice, used by lint and estimate; --tighten proposes, --apply re-opens the storyboard", async () => {
+  const { GATES, loadProject } = await import("../plugins/one-studio/skills/one-studio/scripts/lib/project.mjs");
+  const { gateInputHash, gateState } = await import("../plugins/one-studio/skills/one-studio/scripts/lib/gates.mjs");
+  const { lintProject } = await import("../plugins/one-studio/skills/one-studio/scripts/script-lint.mjs");
+  const { speechRate } = await import("../plugins/one-studio/skills/one-studio/scripts/lib/speech-rate.mjs");
+  const mock = await startMockTts();
+  try {
+    const dir = await project(mock.url);
+    const sb = readJson(join(dir, "storyboard.json"));
+    sb.scenes[0].duration = 12; // planned at 2.8 words/s, far longer than the voice reads it
+    writeJson(join(dir, "storyboard.json"), sb);
+    writeFileSync(join(dir, "script.md"), "## s01 · Mở\n> visual: x\n> silence: 1s\n- Câu thứ nhất.\n- Câu thứ hai dài hơn một chút.\n\n## s02 · Hai\n> visual: y\n- Một câu rất dài để cảnh này phải kéo dài thêm cho khớp với giọng đọc.\n");
+    assert.equal(speechRate(loadProject(dir)).source, "default");
+    const est = (await runAsync("status.mjs", dir, "--estimate")).out;
+  assert.match(est, /Speaking rate: 2\.8 words\/s \(planning default\)/);
+  assert.match(est, /⚠ planned longer than the voice-over.*s01 12s vs ~[\d.]+s of speech/);
+
+    const built = await runAsync("build-audio.mjs", dir, "--allow-tts");
+    assert.equal(built.code, 0, built.err);
+    const wps = readJson(join(dir, "studio.json")).audio.tts.vi.words_per_second.default;
+    assert.ok(wps > 0, "rate stored for the voice");
+    assert.match(built.out, /speaking rate vi\/default: [\d.]+ words\/s/);
+    assert.match(built.out, /longer than their voice-over: build-audio\.mjs <dir> --tighten/);
+    const rate = speechRate(loadProject(dir));
+    assert.deepEqual([rate.source, rate.wps], ["measured", wps]);
+    const st = readJson(join(dir, "studio.json"));
+    st.format.target_duration = 2;
+    writeJson(join(dir, "studio.json"), st);
+    assert.match(lintProject(loadProject(dir)).find((v) => v.rule === "too-long").message, /measured for default/);
+
+    // Approve the storyboard as it is, then propose: nothing written.
+    const p0 = loadProject(dir);
+    const gate = GATES.find((g) => g.id === "storyboard");
+    p0.studio.gates = { ...p0.studio.gates, storyboard: { done: true, hash: gateInputHash(p0, gate) } };
+    p0.save();
+    const proposal = await runAsync("build-audio.mjs", dir, "--tighten");
+    assert.equal(proposal.code, 0, proposal.err);
+    assert.match(proposal.out, /\| s01 \| 12s \| [\d.]+s \| 1s \| \*\*[\d.]+s\*\* \|/);
+    assert.match(proposal.out, /\| s03 \| 3s \| – \| – \| keep \|/);
+    assert.equal(readJson(join(dir, "storyboard.json")).scenes[0].duration, 12, "a proposal never writes");
+
+    const applied = await runAsync("build-audio.mjs", dir, "--tighten", "--apply");
+    assert.equal(applied.code, 0, applied.err);
+    const manifest = readJson(join(dir, "audio", "manifest.json"));
+    const s01 = manifest.scenes.find((s) => s.id === "s01");
+    const want = Math.ceil((s01.vo + 1.2 + 1) * 10 - 1e-9) / 10;
+    assert.equal(readJson(join(dir, "storyboard.json")).scenes[0].duration, want);
+    assert.equal(s01.duration, want, "scene refitted from the cached VO");
+    assert.match(readFileSync(join(dir, "scenes", "s01.html"), "utf8"), new RegExp(`data-duration="${want}"`));
+    assert.equal(mock.calls.length, 3, "no new TTS call");
+    assert.ok(gateState(loadProject(dir), gate).stale, "storyboard approval re-opened");
+  } finally {
+    mock.close();
+  }
+});

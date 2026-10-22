@@ -6,6 +6,8 @@ import { join } from "node:path";
 import { ENGINE_VERSIONS, linkSharedDirs, sceneEngine } from "./project.mjs";
 import { run } from "./ffmpeg.mjs";
 import { effectiveDuration } from "./scenes.mjs";
+import { stripRatioStyles } from "./hash.mjs";
+import { variantRoot } from "./variants.mjs";
 
 const npx = process.platform === "win32" ? "npx.cmd" : "npx";
 
@@ -25,24 +27,31 @@ const hf = (project, args) => run(npx, ["--yes", `hyperframes@${hfVersion(projec
 
 // snapshot only accepts a project folder, so each scene is staged as its own index.html
 // with assets/ linked back to the project.
-// `root` may be an aspect-ratio variant folder (lib/variants.mjs) with resized scenes.
-function stageScene(project, id, { root = project.root, tag = id } = {}) {
+// `root` may be an aspect-ratio variant folder (lib/variants.mjs) with resized scenes; `aspect` is the ratio the
+// stills are for: other ratios' <style data-ratio> blocks are removed (HyperFrames would merge them in).
+function stageScene(project, id, { root = project.root, tag = id, aspect = project.studio.format.aspect } = {}) {
   const stage = join(project.root, ".one-studio", "stage", tag);
   rmSync(stage, { recursive: true, force: true });
   mkdirSync(stage, { recursive: true });
   symlinkSync(join(root, "assets"), join(stage, "assets"), "dir");
   linkSharedDirs(root, stage);
-  const html = readFileSync(join(root, "scenes", `${id}.html`), "utf8").replace(/(["'(])\.\.\/(assets|worlds|capture|flows)\//g, "$1./$2/");
+  const html = stripRatioStyles(readFileSync(join(root, "scenes", `${id}.html`), "utf8"), aspect).replace(/(["'(])\.\.\/(assets|worlds|capture|flows)\//g, "$1./$2/");
   writeFileSync(join(stage, "index.html"), html);
   return stage;
 }
 
 const hyperframes = {
+  // `root` other than the project is a variant folder that is already staged for its ratio (publish).
   render(project, scene, rawOut, { mode, root = project.root }) {
-    hf(project, ["render", root, "-c", `scenes/${scene.id}.html`, "-o", rawOut, "--quality", mode === "preview" ? "draft" : "delivery", "--fps", String(project.studio.format.fps), "--quiet"]);
+    const own = root === project.root ? variantRoot(project, project.studio.format.aspect, { ids: [scene.id], name: `render-${scene.id}` }) : null;
+    try {
+      hf(project, ["render", own ?? root, "-c", `scenes/${scene.id}.html`, "-o", rawOut, "--quality", mode === "preview" ? "draft" : "delivery", "--fps", String(project.studio.format.fps), "--quiet"]);
+    } finally {
+      if (own) rmSync(own, { recursive: true, force: true });
+    }
   },
-  stills(project, scene, times, outDir, { root, tag } = {}) {
-    const stage = stageScene(project, scene.id, { root, tag });
+  stills(project, scene, times, outDir, { root, tag, aspect } = {}) {
+    const stage = stageScene(project, scene.id, { root, tag, aspect });
     rmSync(outDir, { recursive: true, force: true });
     hf(project, ["snapshot", stage, "--at", times.join(","), "--no-end", "-o", outDir, "--describe", "false"]);
     return readdirSync(outDir).filter((f) => f.endsWith(".png")).sort().map((f) => join(outDir, f));

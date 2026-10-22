@@ -35,7 +35,7 @@ function ratioStills(project, scenes, aspect, { all, ids }) {
       const outDir = join(project.root, "review", tag, scene.id);
       const engine = sceneEngine(scene, project.studio);
       const stills = engine === "hyperframes"
-        ? ENGINES.hyperframes.stills(project, scene, t, outDir, { root, tag: `${scene.id}-${tag}` })
+        ? ENGINES.hyperframes.stills(project, scene, t, outDir, { root, tag: `${scene.id}-${tag}`, aspect })
         : ENGINES.lemo.stills(project, scene, t, outDir, { size: ASPECTS[aspect] });
       rows.push({ id: scene.id, times: t, stills });
       const st = states.get(scene.id);

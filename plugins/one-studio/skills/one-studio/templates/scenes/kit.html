@@ -1,0 +1,14 @@
+  <div class="os-frame os-center clip" data-start="0" data-duration="{{duration}}" data-track-index="0">
+    <div class="os-kit" data-component="{{component}}">
+{{component_markup}}
+    </div>
+  </div>
+</div>
+<script>
+  const S = OS.scene("{{id}}");
+  S.enter(".os-kit", { at: 0.2, kind: "up" });
+  S.lines();
+  S.done();
+</script>
+</body>
+</html>

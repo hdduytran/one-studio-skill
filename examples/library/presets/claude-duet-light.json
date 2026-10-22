@@ -1,0 +1,52 @@
+{
+  "about": "Claude Duet: lavender page, cream cards, near-black ink, rust accent",
+  "surface": "flat",
+  "colors": {
+    "bg": "#cccad8",
+    "fg": "#141413",
+    "primary": "#706f6c",
+    "secondary": "#716c8c",
+    "accent": "#b25435",
+    "muted": "#575364",
+    "surface": "#faf9f5"
+  },
+  "typography": {
+    "heading": {
+      "family": "Fraunces",
+      "weight": 400,
+      "fontsource": "fraunces@5.3.0",
+      "fallback": "Georgia, serif"
+    },
+    "body": {
+      "family": "Inter",
+      "weight": 400,
+      "fontsource": "inter@5.2.8",
+      "fallback": "Helvetica, Arial, sans-serif"
+    }
+  },
+  "motion": {
+    "ease": {
+      "in": "power3.in",
+      "out": "power2.out",
+      "inOut": "power2.inOut"
+    },
+    "stagger": 0.12,
+    "duration": {
+      "fast": 0.4,
+      "base": 0.8,
+      "slow": 1.6
+    }
+  },
+  "transitions": {
+    "default": "fade"
+  },
+  "captions": {
+    "position": "bottom",
+    "size": 44,
+    "background": "none"
+  },
+  "source": {
+    "slug": "claude-duet",
+    "title": "source"
+  }
+}

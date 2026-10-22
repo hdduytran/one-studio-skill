@@ -121,6 +121,12 @@
           ],
           "minimum": 1
         },
+        "platforms": {
+          "type": "array",
+          "description": "Where the video will be posted (gate 0). shorts / tiktok / reels need a 9:16 export and keep 9:16 burned captions out of the platform UI.",
+          "items": { "enum": ["youtube", "shorts", "tiktok", "reels", "facebook", "linkedin"] },
+          "uniqueItems": true
+        },
         "exports": {
           "type": "array",
           "items": {
@@ -351,6 +357,11 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 51
+        },
+        "ratio_stage": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Set on projects created after <style data-ratio> blocks were staged per ratio at render time; older projects re-render scenes that have ratio blocks once."
         }
       }
     },
@@ -525,6 +536,11 @@
         "key_env": {
           "type": "string",
           "pattern": "^[A-Z][A-Z0-9_]*$"
+        },
+        "words_per_second": {
+          "type": "object",
+          "description": "Measured speaking rate per voice (key: voice, or voice@speed when speed is not 1). Written by build-audio and voice samples; used by script-lint, status --estimate and storyboard planning instead of the 2.8 / 2.5 defaults.",
+          "additionalProperties": { "type": "number", "exclusiveMinimum": 0 }
         }
       }
     },

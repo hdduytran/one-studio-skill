@@ -60,14 +60,14 @@ Layers (later wins, field by field): `style.json` (extraction only) < `style.enh
 1. Only after the latest step 4 sheet (with the variant, if one is used) was shown and the user said an explicit OK in chat. Customizing or enhancing never applies anything by itself.
 2. `style-apply.mjs D <slug> --dry-run` first: it prints how many approved scenes will need re-approval. If that number is above 0, tell the user and ask again ("N cảnh đã duyệt sẽ phải duyệt lại, tiếp tục không?") before the real run. The script itself never asks.
 3. The script refuses (exit 1, nothing written) when text/background pairs fail WCAG AA. Tell the user, offer the `contrast` proposal (`style-enhance.mjs D <slug>` lists it as `[contrast]`; then `--accept contrast`) or new colours via `style-set`, then run `style-compare` again. Add `--allow-low-contrast` only when the user insists after hearing the reason.
-4. Run it for real. Add `--as-preset <name>` when the user wants to reuse the look in other projects (saved under the plugin cache, listed at gate 0; a plugin preset name is refused). Footage (`source.*`, `frames/`) is deleted unless `--keep` (or the fetch used it).
+4. Run it for real. Add `--as-preset <name>` when the user wants to reuse the look in other projects (saved in the user library `<library>/presets/`, see `../one-studio/references/user-library.md`, listed at gate 0; a plugin preset name is refused). A look already applied and tuned is saved with `library.mjs D --save-preset <name>`. A card colour (`colors.surface`) is kept apart from `primary`, so presets keep cream cards cream. Footage (`source.*`, `frames/`) is deleted unless `--keep` (or the fetch used it).
 5. Then `prepare-project.mjs D` and, for existing scenes, `keyframe-stills.mjs` and re-approval.
 6. `style-refs/<slug>/hints.json` (`applied_hash`, `storyboard`, `audio`, `writing`, `do_not_copy`) is read at gate 3 (shot length, visual modes, camera, SFX density, intro/outro) and gate 7 (loudness, music bed). `story.format` and `story.tone` are filled from the style only when empty; an approved writers-room choice is never overwritten.
 
 ## Consent (hard rules)
 
 - A link is downloaded only when `studio.json → services.download` is `true`. Otherwise ask once ("Mình được tải video từ link này về máy để phân tích không?"), then set it. A local file needs no consent.
-- Never install `yt-dlp` or any tool without asking. Never use browser cookies. A link that needs login: stop and tell the user to download it themselves and pass the file.
+- Never install `yt-dlp` or any tool without asking. Never use browser cookies. A link that needs login: stop and tell the user to download it themselves and pass the file. Subtitles are optional: when only they fail (auto-subs often get HTTP 429) the video is fetched again without them and the fetch prints `subtitles skipped`. Every yt-dlp error ends with yt-dlp's own `ERROR:` line; quote it to the user instead of guessing.
 - Default analysed span is the first 90 s; `--from` / `--to` choose another.
 - Approval to apply is the user's explicit OK in chat, after step 4.
 

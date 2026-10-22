@@ -2,7 +2,8 @@
 
 ## Incremental render model
 - Scene hash = scene source + every local file it references (CSS, fonts, JS, SVG, Lottie) + brand version + engine version + width/height/fps. VO, captions and sound files (`assets/sfx/`, `assets/music/`, `assets/audio-cues.js`) are not in it.
-- `<style data-ratio="9:16,4:5">` blocks count only for those ratios (os.js disables them elsewhere): the main hash skips them, the export ratio's variant hash includes them. Put each block on its own lines; comments go inside the CSS.
+- `<style data-ratio="9:16,4:5">` blocks count only for those ratios: the main hash skips them, the export ratio's variant hash includes them. Put each block on its own lines; comments go inside the CSS.
+- Every snapshot and render is staged per ratio with the other ratios' blocks removed (`stripRatioStyles`). Removal is the guarantee, not os.js: HyperFrames merges adjacent `<style>` blocks when it loads a scene and drops `data-ratio`, so a runtime switch-off cannot hold. Projects created before this (no `render.ratio_stage` in `studio.json`) re-make stills and clips of scenes with ratio blocks once. Scoping rules with `.os-portrait` / `.os-square` inside the block is still allowed.
 - Gates 5–6 compare a layout-only hash (no `data-duration`, no `os-lines` timings), so build-audio fitting scenes to the VO never re-opens them; clips are still re-rendered because the full hash changed.
 - Clips: `out/preview/<id>-<hash>.mp4` (low-res) and `out/scenes/<id>-<hash>.mp4` (final). A clip that exists for the current hash is never rendered again; old hashes of the same scene are deleted.
 - A scene renders only if its keyframes were approved for that exact hash (`studio.json → scenes[].approved_hash`). Editing a scene clears that, so the user sees a new still first.
