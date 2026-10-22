@@ -35,7 +35,8 @@ Hoặc từ bản clone: `claude plugin marketplace add ./` rồi `claude plugin
 | `ONE_STUDIO_LEMO_LIB`, `PLAYWRIGHT_CHROME` | thư viện lemo-opuscar và Chrome của nó |
 | `ONE_STUDIO_ANATOMY` | thư mục anatomy nếu không cài dạng skill |
 | `ONE_STUDIO_CHROME`, `ONE_STUDIO_REMOTION_GL` | Chrome và WebGL backend cho Remotion |
-| `ONE_STUDIO_CACHE` | cache npm của GSAP/howler/three/lottie/font và preset lưu từ video (`presets/`); mặc định `~/.cache/one-studio` |
+| `ONE_STUDIO_CACHE` | cache npm của GSAP/howler/three/lottie/font; mặc định `~/.cache/one-studio`. Preset lưu ở `presets/` trong đó trước khi có thư viện vẫn được đọc |
+| `ONE_STUDIO_LIBRARY` | thư mục thư viện của bạn (preset, mockup kit, playbook riêng); không đặt thì tìm `library/` hoặc `one-studio.library.json` ở các thư mục cha của project |
 | `ONE_STUDIO_YTDLP` | đường dẫn tới `yt-dlp` nếu không nằm trong PATH |
 
 ## Dùng
@@ -55,7 +56,7 @@ Gõ `/one-studio` kèm yêu cầu, ví dụ `/one-studio làm video 40 giây gi�
 | 9 Render | `render-changed-scenes.mjs`, `concat-and-mix.mjs` |
 | 10 Publish | `publish.mjs [--ratios 9:16,1:1] [--thumb-frame s02@3.5]` |
 
-Công cụ khác: `script-lint.mjs`, `seam-check.mjs`, `capture-screen.mjs`, `validate.mjs`, `brand-to-css.mjs`, `optimize-assets.mjs`, `anatomy-to-svg.mjs`, `new-remotion.mjs`, `series-bumper.mjs`, `make-sfx.mjs`, `sync-lines.mjs`, `tts-openai-compatible.mjs --probe | --voices | --samples all | --use-voice <id>`, `check-external.mjs`.
+Công cụ khác: `library.mjs` (thư viện của bạn), `script-lint.mjs`, `seam-check.mjs`, `capture-screen.mjs`, `validate.mjs`, `brand-to-css.mjs`, `optimize-assets.mjs`, `anatomy-to-svg.mjs`, `new-remotion.mjs`, `series-bumper.mjs`, `make-sfx.mjs`, `sync-lines.mjs`, `tts-openai-compatible.mjs --probe | --voices | --samples all | --use-voice <id>`, `check-external.mjs`.
 
 ## Lấy style từ video
 
@@ -76,8 +77,27 @@ Công cụ khác: `script-lint.mjs`, `seam-check.mjs`, `capture-screen.mjs`, `va
 - **Nền tảng:** YouTube, TikTok, Facebook, Instagram qua yt-dlp. Video riêng tư, cần đăng nhập hoặc giới hạn tuổi (hay gặp ở Facebook và Instagram) thì dừng lại, bạn tự tải rồi đưa file. TikTok và Instagram đôi khi chặn tải; đưa file là cách chắc nhất. Phụ đề chỉ là phần thêm: tải phụ đề lỗi (hay gặp HTTP 429) thì video vẫn được tải, không kèm phụ đề.
 - **Không bao giờ lấy:** khung hình, logo, linh vật, nhân vật, slogan và chữ trên hình, nhạc, giọng, tên tác giả. Chỉ lấy cách trình bày (màu, phông gần nhất, nhịp, chuyển cảnh, kiểu phụ đề, loudness). Nhạc chỉ gợi ý bản nền gần nhất có sẵn. Video gốc nằm trong `style-refs/` (git bỏ qua) và bị xoá sau khi áp, trừ khi dùng `--keep`.
 - **Enhance và customize:** style gồm các lớp, lớp sau thắng: số đo < đề xuất đã nhận < chỉnh của bạn (có thể khoá) < biến thể sáng/tối. Trích lại hay gộp không ghi đè phần bạn đã chỉnh hoặc khoá. Style luôn đạt WCAG AA cho chữ chính; nếu không, `style-apply` từ chối (đổi màu hoặc nhận đề xuất `contrast`, hoặc `--allow-low-contrast` nếu bạn chắc).
-- **Preset:** `--as-preset tên` lưu look vào `$ONE_STUDIO_CACHE/presets/<tên>.json` (mặc định `~/.cache/one-studio/presets/`). Preset đó hiện trong `compare-presets.mjs` và `init-project.mjs --preset`; preset có sẵn của plugin không bao giờ bị ghi đè.
+- **Preset:** `--as-preset tên` lưu look vào thư viện của bạn (`<thư viện>/presets/<tên>.json`, xem mục Thư viện bên dưới). Preset đó hiện trong `compare-presets.mjs` và `init-project.mjs --preset`; preset có sẵn của plugin không bao giờ bị ghi đè. Màu thẻ/khung (`colors.surface`, ví dụ thẻ kem trên nền tím nhạt) được giữ riêng, không bị làm tối như màu chữ.
 - `status.mjs` hiện style đang dùng và đánh dấu `!` khi style card đổi sau lần áp; `validate.mjs` kiểm `story.style` trỏ tới style có thật.
+
+## Thư viện của bạn
+
+Một thư mục dùng chung cho mọi project, giữ những gì bạn muốn dùng lại: look (preset), mockup kit (giao diện điện thoại, bong bóng chat, thẻ…) và cấu trúc kịch bản (playbook riêng). Tìm theo thứ tự: `ONE_STUDIO_LIBRARY`, rồi `one-studio.library.json` (`{ "path": "…" }`) hoặc thư mục tên đúng `library` (có `presets/`, `kits/` hoặc `playbooks/`) ở các thư mục cha của project, cuối cùng là cache cũ.
+
+```
+<thư viện>/presets/<tên>.json · kits/<kit>/kit.css + components/*.html + gallery.html · playbooks/<id>.md
+```
+
+| Lệnh | Việc |
+|---|---|
+| `library.mjs --init <thư mục>` | tạo thư viện |
+| `library.mjs <dir> [--presets \| --kits \| --playbooks]` | thư viện nằm đâu, có gì |
+| `library.mjs <dir> --save-preset <tên>` | lưu look hiện tại của project, không cần áp lại style |
+| `library.mjs <dir> --import-cache` | chép preset cũ trong cache vào thư viện |
+| `new-scene.mjs <dir> <id> --kit <kit> [--component <tên>]` | chép CSS của kit vào scene (scene tự đủ, đổi kit thì chạy lại để cập nhật); `--component` dựng scene từ một mẫu |
+| `library.mjs <dir> --kit-gallery <kit>` | trang xem mọi mẫu của kit với brand của project |
+
+Playbook riêng hiện cạnh 14 playbook có sẵn (id trùng thì bản có sẵn thắng). Ví dụ đầy đủ: `examples/library/` (look Claude Duet, kit 9 mẫu, playbook `product-launch-short`). Chi tiết: `plugins/one-studio/skills/one-studio/references/user-library.md`.
 
 ## Viết kịch bản: writers-room
 

@@ -36,7 +36,9 @@ Playbook ids: `saas-product`, `opensource-devtool`, `comparison`, `customer-stor
 Format ids (a layer on top, pick at most one): `short-vertical`, `long-form`, `series-episode`, `no-voice`.
 Mode ids: `world-camera`, `match-cut-motif`, `screen-cinema`, `desk-collage`, `exploded-cutaway`, `kinetic-type`, `split-compare`, `archive-documents`, `data-story-motion`.
 
-Choosing: match the user's request against `playbooks/index.md`; if two fit, ask one question. Tone: pick from `tones.md` by the brief's point of view, do not mix.
+The user's own playbooks live in their library (`<library>/playbooks/<id>.md`, same nine sections). `node "$S/scripts/library.mjs" <project> --playbooks` lists built-in and library ones together with their signals; a library playbook is loaded from the path it prints, and only when its id is not built in (built-in ids always win).
+
+Choosing: match the user's request against `playbooks/index.md` and the library list; if two fit, ask one question. Tone: pick from `tones.md` by the brief's point of view, do not mix.
 
 ## Gate 1 (brief)
 

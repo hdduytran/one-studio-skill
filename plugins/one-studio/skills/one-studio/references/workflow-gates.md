@@ -14,7 +14,7 @@ Marks printed by status: `✓` done · `→` current · `!` input changed after 
   > 1. Video mới hay tập tiếp theo của series nào?
   > 2. Đăng ở đâu (YouTube, YouTube Shorts, TikTok, Reels…)? 2D, 3D hay kết hợp? Tỉ lệ khung (16:9, 9:16, 1:1) và độ dài? Có cần xuất thêm tỉ lệ khác không?
   > 3. Giọng đọc tiếng Việt qua ZeroTTS ở `http://localhost:8000` đúng không?
-  > 4. Màu/phông/logo riêng, hay chọn một mẫu: `apple-light`, `apple-keynote`, `neon-terminal`, `synthwave`, `ocean-calm`, `warm-editorial`, `swiss-mono`, `infinity-board`, `default`, các mẫu đã lưu từ video trước (xem `init-project.mjs --help`), hoặc lấy style từ một video/link có sẵn? (mình có thể dựng bảng so sánh)
+  > 4. Màu/phông/logo riêng, hay chọn một mẫu: `apple-light`, `apple-keynote`, `neon-terminal`, `synthwave`, `ocean-calm`, `warm-editorial`, `swiss-mono`, `infinity-board`, `default`, các mẫu bạn đã lưu trong thư viện (xem `init-project.mjs --help` hoặc `library.mjs D --presets`), hoặc lấy style từ một video/link có sẵn? (mình có thể dựng bảng so sánh)
   > 5. Phụ đề: **không** · **chỉ file .srt** · **phụ đề mềm** (bật/tắt được, kèm .srt) · **in cứng vào hình**?
   > 6. Được dùng dịch vụ trả phí / từ xa nào không? (mặc định: không)
 - **Do:** `node "$S/scripts/init-project.mjs" D --title "…" --lang <code> --dimension <2d|3d|mixed> --aspect <ratio> --duration <s> [--exports 16:9,9:16] [--platform shorts,tiktok,reels,youtube] [--preset <name>] [--captions none|sidecar|mux|burn] [--tts-url <url>] [--probe-tts] [--series <name>] [--series-root <dir>]`.
@@ -66,7 +66,7 @@ Marks printed by status: `✓` done · `→` current · `!` input changed after 
 
 ## 5 · Keyframe review — approval per scene
 
-- **Do:** `prepare-project.mjs D` (runtime, fonts, brand CSS, vendored libs, preview SFX cues) → `new-scene.mjs D --all` (templates per type; lemo scenes get a folder; Remotion scenes: `new-remotion.mjs D`) → write each scene (read its type reference first) → `keyframe-stills.mjs D` (only changed/unapproved scenes) → look at `review/sheet.jpg` yourself, fix, re-run for those ids.
+- **Do:** `prepare-project.mjs D` (runtime, fonts, brand CSS, vendored libs, preview SFX cues) → `new-scene.mjs D --all` (templates per type; lemo scenes get a folder; Remotion scenes: `new-remotion.mjs D`) → write each scene (read its type reference first; when the look has a mockup kit in the library, `new-scene.mjs D <id> --kit <kit> [--component <name>]`, see `references/user-library.md`) → `keyframe-stills.mjs D` (only changed/unapproved scenes) → look at `review/sheet.jpg` yourself, fix, re-run for those ids.
   - Other ratios in `format.exports` are captured too (one middle frame per scene → `review/sheet-<ratio>.jpg`). Fix portrait/square layout now with `<style data-ratio="9:16">` blocks: they are hashed for that ratio only, so the main-ratio approval and clips stay valid. These sheets are for review; approval follows the main ratio.
   - Same-world and `handoff` pairs also get `review/seams.jpg` (last frame of A beside first of B, with the pixel difference). Same-world seams above 2% are warnings here: fix the camera/state so the scenes meet, then re-run `seam-check.mjs D [--pairs s01:s02] [--threshold 0.02]` (exit 1 on a bad seam). Handoff differences are for the eye.
   - Without FFmpeg drawtext the sheets have no labels: rows/tiles are in storyboard order; say so when you show them.
