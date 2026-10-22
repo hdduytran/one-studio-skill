@@ -62,7 +62,7 @@ export function ensureGitignore(project) {
 // Fields the card must account for in `provenance`: dotted paths down to three segments
 // (brand.colors.primary, brand.typography.heading, audio.music.bpm); deeper values belong to their parent.
 const PROVENANCE_DEPTH = 3;
-function leafPaths(value, prefix, out) {
+export function leafPaths(value, prefix, out) {
   if (value && typeof value === "object" && !Array.isArray(value) && prefix.split(".").length < PROVENANCE_DEPTH) {
     for (const [k, v] of Object.entries(value)) leafPaths(v, prefix ? `${prefix}.${k}` : k, out);
   } else out.push(prefix);
@@ -103,6 +103,13 @@ export function loadStyle(project, slug) {
   const errors = styleErrors(style, { slug, brand: typeof project === "object" ? project.brand : null });
   if (errors.length) throw new Error(`Invalid style ${file}:\n  ${errors.join("\n  ")}`);
   return style;
+}
+
+// The one place compare, apply and merge read a style from: today style.json, later the layered
+// style.json <- enhance <- custom <- variants/<v>.json. `variant` is rejected until variants exist.
+export function resolveStyle(project, slug, { variant } = {}) {
+  if (variant) throw new Error(`variants arrive with customize; "${variant}" cannot be used yet`);
+  return loadStyle(project, slug);
 }
 
 // validate.mjs hook: one result per style-refs/<slug>/style.json (none when the folder is absent).

@@ -16,11 +16,23 @@ Reads HOW a reference video looks and moves, never WHAT it shows. Output lands i
 | 1 | Fetch | `node "$S/scripts/style-fetch.mjs" D <url\|file> [--slug s] [--from 0:00] [--to 1:30] [--max 90] [--keep]` | `style-refs/<slug>/source.*`, `info.json`, `subs.vtt?` |
 | 2 | Analyze | `node "$S/scripts/style-analyze.mjs" D <slug>` | `metrics.json`, `frames/`, `review/style-<slug>-*.jpg` (2 contact sheets) |
 | 3 | Read & map | look at the 2 sheets + `metrics.json`, load `references/reading-guide.md` and `references/mapping.md`; `style-draft.mjs D <slug>` | `style.json` (+ `STYLE.md`) |
-| 4 | Compare | `node "$S/scripts/style-compare.mjs" D <slug> [--variant v]` | 3 sample scenes in the style, side by side with the reference sheet |
+| 4 | Compare | `node "$S/scripts/style-compare.mjs" D <slug> [--variant v] [--ratio 9:16] [--offline]` | `review/style-<slug>-compare.jpg`: row 1 reference frames, row 2 title / chart / caption samples in the style, row 3 colour tokens |
 | 5 | Enhance & customize | `style-enhance.mjs D <slug>` (proposals with reasons, apply only what the user accepts), `style-set.mjs D <slug> key=value … [--lock key]`, `style-diff.mjs D <slug>`, `style-editor.mjs D <slug>` | `style.enhance.json`, `style.custom.json`; repeat step 4 after each round |
-| 6 | Apply | `node "$S/scripts/style-apply.mjs" D <slug> [--variant v] [--as-preset name] [--keep] [--dry-run]` | `brand.json` patched with `version` bumped, `studio.json → story.style`, storyboard hints |
+| 6 | Apply | `node "$S/scripts/style-apply.mjs" D <slug> [--variant v] [--as-preset name] [--keep] [--dry-run]` | `brand.json` patched with `version` bumped, `studio.json → story.style`, `style-refs/<slug>/hints.json` |
 
-Merge several references: `style-merge.mjs D <slug-a> <slug-b> --as <slug>`.
+Merge several references: `node "$S/scripts/style-merge.mjs" D <slug-a> <slug-b> [...] --as <slug>` (numbers: median; colours: only those found in at least 2 sources; other values: majority, a tie leaves the field out and it is listed as open; then run `style-draft.mjs D <slug> --check` and step 4).
+
+### Step 4 · Compare
+
+Run it with `--ratio` only when the user wants another frame than the reference's. Show `review/style-<slug>-compare.jpg` to the user and read out the tile order the script prints (the sheet has no captions when FFmpeg lacks `drawtext`), plus the heading and body font names. Works with no scenes in the project (gate 0). It renders stills only: no video, no approvals touched. Ask: "Style này đúng ý chưa? Mình áp dụng vào brand nhé?"
+
+### Step 6 · Apply
+
+1. Only after step 4's sheet was shown and the user said an explicit OK in chat.
+2. `style-apply.mjs D <slug> --dry-run` first: it prints how many approved scenes will need re-approval. If that number is above 0, tell the user and ask again ("N cảnh đã duyệt sẽ phải duyệt lại, tiếp tục không?") before the real run. The script itself never asks.
+3. Run it for real. Add `--as-preset <name>` when the user wants to reuse the look in other projects (saved under the plugin cache, listed at gate 0; a plugin preset name is refused). Footage (`source.*`, `frames/`) is deleted unless `--keep` (or the fetch used it).
+4. Then `prepare-project.mjs D` and, for existing scenes, `keyframe-stills.mjs` and re-approval.
+5. `style-refs/<slug>/hints.json` (`storyboard`, `audio`, `writing`, `do_not_copy`) is read at gate 3 (shot length, visual modes, camera, SFX density, intro/outro) and gate 7 (loudness, music bed). `story.format` and `story.tone` are filled from the style only when empty; an approved writers-room choice is never overwritten.
 
 ## Consent (hard rules)
 

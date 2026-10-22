@@ -114,10 +114,11 @@ export function neededTools(project) {
     if (e === "remotion") need.add("remotion");
     if (s.type === "screen") need.add("capture");
   }
-  // A style reference recorded from a link whose footage is not on disk yet.
+  // A style reference recorded from a link whose footage is not on disk yet. Once style.json exists the fetch is
+  // done (style-apply deletes the footage on purpose), so such folders never need the downloader again.
   for (const slug of listStyleSlugs(project)) {
     const dir = styleDir(project, slug);
-    if (!existsSync(join(dir, "info.json"))) continue;
+    if (!existsSync(join(dir, "info.json")) || existsSync(join(dir, "style.json"))) continue;
     let info;
     try {
       info = JSON.parse(readFileSync(join(dir, "info.json"), "utf8"));

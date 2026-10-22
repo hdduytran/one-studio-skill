@@ -1,0 +1,27 @@
+  <div class="os-frame clip" data-start="0" data-duration="{{duration}}" data-track-index="0">
+    <h2 class="os-h2">Lượt xem tăng đều qua từng quý</h2>
+    <div class="os-chart" style="flex: 1 1 auto; min-height: 0"></div>
+  </div>
+</div>
+<script>
+  const rows = [
+    { quý: "Quý 1", views: 12 },
+    { quý: "Quý 2", views: 19 },
+    { quý: "Quý 3", views: 27 },
+    { quý: "Quý 4", views: 41 }
+  ];
+  const bars = OS.barChart(".os-chart", rows, { highlight: "last" });
+  // Series colours: every bar takes the next brand colour, so a style's whole palette shows up.
+  const series = ["--c-primary", "--c-secondary", "--c-muted", "--c-accent"];
+  bars.forEach(function (bar, i) {
+    bar.querySelector(".os-bar-fill").style.background = "var(" + series[i % series.length] + ")";
+  });
+  const S = OS.scene("{{id}}");
+  S.enter(".os-h2", { at: 0.2 });
+  S.bars(bars, { at: 0.8 });
+  S.count(".os-bar-value", { at: 0.8 });
+  S.enter(".os-bar-label", { at: 0.6, kind: "fade", stagger: 0.1 });
+  S.done();
+</script>
+</body>
+</html>

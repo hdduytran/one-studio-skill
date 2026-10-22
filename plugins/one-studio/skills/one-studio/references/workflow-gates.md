@@ -14,12 +14,13 @@ Marks printed by status: `✓` done · `→` current · `!` input changed after 
   > 1. Video mới hay tập tiếp theo của series nào?
   > 2. 2D, 3D hay kết hợp? Tỉ lệ khung (16:9, 9:16, 1:1) và độ dài? Có cần xuất thêm tỉ lệ khác không?
   > 3. Giọng đọc tiếng Việt qua ZeroTTS ở `http://localhost:8000` đúng không?
-  > 4. Màu/phông/logo riêng, hay chọn một mẫu: `apple-light`, `apple-keynote`, `neon-terminal`, `synthwave`, `ocean-calm`, `warm-editorial`, `swiss-mono`, `infinity-board`, `default`, hoặc lấy style từ một video/link có sẵn? (mình có thể dựng bảng so sánh)
+  > 4. Màu/phông/logo riêng, hay chọn một mẫu: `apple-light`, `apple-keynote`, `neon-terminal`, `synthwave`, `ocean-calm`, `warm-editorial`, `swiss-mono`, `infinity-board`, `default`, các mẫu đã lưu từ video trước (xem `init-project.mjs --help`), hoặc lấy style từ một video/link có sẵn? (mình có thể dựng bảng so sánh)
   > 5. Phụ đề: **không** · **chỉ file .srt** · **phụ đề mềm** (bật/tắt được, kèm .srt) · **in cứng vào hình**?
   > 6. Được dùng dịch vụ trả phí / từ xa nào không? (mặc định: không)
 - **Do:** `node "$S/scripts/init-project.mjs" D --title "…" --lang <code> --dimension <2d|3d|mixed> --aspect <ratio> --duration <s> [--exports 16:9,9:16] [--preset <name>] [--captions none|sidecar|mux|burn] [--tts-url <url>] [--probe-tts] [--series <name>] [--series-root <dir>]`.
   - With `--series`, brand lives at `<series-root>/<name>/brand/brand.json` (default series root `D/../series`). If it exists it is reused: **do not ask brand questions**; the captions answer then goes to `studio.json → captions`.
-  - "Lấy style từ video/link" → load `../style-extract/SKILL.md` and follow its steps (fetch needs `services.download`, asked once); its apply step writes `brand.json` and `studio.json → story.style`.
+  - "Lấy style từ video/link" → load `../style-extract/SKILL.md` and follow its steps (fetch needs `services.download`, asked once); its compare step shows 3 sample scenes in the style (works with no scenes yet); its apply step writes `brand.json` and `studio.json → story.style`, and only after the user's explicit OK on that sheet (ask again when approved scenes would need re-approval).
+  - Presets saved from a style (`style-apply --as-preset`) live in the plugin cache and appear in `compare-presets.mjs`, `init-project --preset` and the list above like the built-in ones.
   - Unsure about the look → after scenes exist, `compare-presets.mjs D` renders the same scenes in every preset (`review/presets.jpg`); `--apply <preset>` sets it. Presets `apple-light` and `synthwave` use the glass surface (`brand.json → surface: "glass"`).
   - Write the user's brand answers into `brand.json` (keep `version: 1` for a new kit).
   - Captions answer → `--captions` (mapping in `references/audio-tts.md`). Init warns when FFmpeg has no libass: `burn` becomes `mux`; tell the user.
@@ -46,7 +47,7 @@ Marks printed by status: `✓` done · `→` current · `!` input changed after 
 
 ## 3 · Storyboard — approval
 
-- **Do:** write `D/storyboard.json` from the approved script (`schemas/storyboard.schema.json`):
+- **Do:** write `D/storyboard.json` from the approved script (`schemas/storyboard.schema.json`). When `studio.json → story.style.slug` is set and `style-refs/<slug>/hints.json` exists, read its `storyboard` block as defaults (`target_shot_seconds`, `visual_modes`, `camera`, `sfx_density`, `intro`, `outro`) and its `do_not_copy` as things to avoid; the approved script and the user's choices still win:
   - one scene per script heading, same id; `lines[]` = the bullets (`id` = `<scene>-<n>`; `say` when numbers must be spelled out for TTS while `text` keeps digits);
   - visual modes come from `story.modes` (writers-room `visual-modes/`, at most 3 loaded);
   - `type` per scene: `text | diagram | data | lottie | rive | explainer | character | screen | 3d`. Prefer cheap types; use `explainer`, `character`, `screen`, `3d` only when the idea needs them;
@@ -78,6 +79,7 @@ Marks printed by status: `✓` done · `→` current · `!` input changed after 
 
 ## 7 · Audio
 
+- **Style hints:** when `story.style` is set, `style-refs/<slug>/hints.json → audio` suggests loudness (`lufs`), whether the reference had a voice, and a nearest built-in bed (`music.preset`/`mood`/`bpm`): offer that bed first among the music samples, never the reference's own track.
 - **Music** (when `studio.json → audio.music` is `null`): `make-music.mjs D --samples` → `audio-picker.mjs D` → show `review/audio-picker.html` (and the `review/music/*.m4a` paths). Ask: "Bạn chọn nhạc nền nào: ambient, ambient-bright, lofi, lofi-dark, file của bạn, hay không nhạc?" → `make-music.mjs D --use <bed|path|none>`.
 - **Captions** (re-ask only if the user wants to change the gate 0 answer): "Giữ phụ đề <mode> chứ?" → `status.mjs D --captions <mode>`.
 - **SFX** (optional): add `scenes[].sfx[]` cues to the storyboard (`references/audio-tts.md`); the picker page lists the built-in kit.

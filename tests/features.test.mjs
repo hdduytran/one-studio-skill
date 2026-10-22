@@ -15,7 +15,7 @@ import { sceneHash, sceneText } from "../plugins/one-studio/skills/one-studio/sc
 import { variantHash } from "../plugins/one-studio/skills/one-studio/scripts/lib/variants.mjs";
 import { gateInputHash, gateProblems } from "../plugins/one-studio/skills/one-studio/scripts/lib/gates.mjs";
 import { writeLineTimes } from "../plugins/one-studio/skills/one-studio/scripts/lib/scenes.mjs";
-import { applyPreset, PRESET_NAMES } from "../plugins/one-studio/skills/one-studio/scripts/lib/presets.mjs";
+import { applyPreset, loadPresets, PRESET_NAMES } from "../plugins/one-studio/skills/one-studio/scripts/lib/presets.mjs";
 import { brandToCss } from "../plugins/one-studio/skills/one-studio/scripts/brand-to-css.mjs";
 import { parseThumbFrame } from "../plugins/one-studio/skills/one-studio/scripts/publish.mjs";
 
@@ -246,4 +246,37 @@ test("infinity-board preset: board palette and a Vietnamese-capable font", () =>
   assert.equal(brand.surface, "flat");
   assert.match(brand.typography.heading.fontsource, /^be-vietnam-pro@/);
   assert.match(brand.typography.body.fontsource, /^be-vietnam-pro@/);
+});
+
+test("cached presets join the plugin presets; init-project --preset takes them; a plugin name clash is an error", () => {
+  const cache = tmp();
+  const prev = process.env.ONE_STUDIO_CACHE;
+  process.env.ONE_STUDIO_CACHE = cache;
+  try {
+    mkdirSync(join(cache, "presets"));
+    const entry = { about: "Test look", surface: "glass", colors: { bg: "#101820", fg: "#f2f2f2", primary: "#e30613", accent: "#f2c200" }, captions: { position: "middle" } };
+    writeJson(join(cache, "presets", "cached-look.json"), entry);
+    writeFileSync(join(cache, "presets", "broken.json"), "{ nope");
+    assert.ok(PRESET_NAMES().includes("cached-look") && PRESET_NAMES().includes("default"));
+    assert.ok(!PRESET_NAMES().includes("broken"), "an unreadable cache file is skipped");
+    assert.deepEqual(loadPresets()["cached-look"], entry);
+
+    const brand = applyPreset(readJson("examples/demo/brand/brand.json"), "cached-look");
+    assert.equal(brand.preset, "cached-look");
+    assert.equal(brand.captions.position, "middle");
+    assert.equal(brand.captions.mode, readJson("examples/demo/brand/brand.json").captions?.mode, "preset sections merge, they do not replace");
+    assert.deepEqual(validateKind("brand", brand), []);
+
+    const dir = join(tmp(), "p");
+    assert.equal(run("init-project.mjs", dir, "--lang", "vi", "--preset", "cached-look").code, 0);
+    const p = loadProject(dir);
+    assert.equal(p.brand.colors.primary, "#e30613");
+    assert.equal(p.brand.surface, "glass");
+
+    writeJson(join(cache, "presets", "synthwave.json"), entry);
+    assert.throws(() => loadPresets(), /clashes with a plugin preset/);
+  } finally {
+    if (prev === undefined) delete process.env.ONE_STUDIO_CACHE;
+    else process.env.ONE_STUDIO_CACHE = prev;
+  }
 });
