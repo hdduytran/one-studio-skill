@@ -186,6 +186,10 @@
         "download": {
           "type": "boolean",
           "description": "Allow downloading a reference video from a link the user gave (style-extract); never used without it."
+        },
+        "stt": {
+          "type": "boolean",
+          "description": "Allow sending voice-over sentences to the speech-to-text server (check-pronunciation.mjs)."
         }
       },
       "additionalProperties": {
@@ -326,6 +330,13 @@
         "trim": {
           "type": "boolean",
           "description": "Trim leading/trailing silence of each TTS sentence."
+        },
+        "stt": {
+          "type": "object",
+          "description": "Key = language code or 'default'. OpenAI-compatible transcription endpoint used by check-pronunciation.mjs (screening only). API keys come from env.",
+          "additionalProperties": {
+            "$ref": "#/$defs/sttEndpoint"
+          }
         }
       }
     },
@@ -567,6 +578,31 @@
         },
         "duration": {
           "type": "number"
+        }
+      }
+    },
+    "sttEndpoint": {
+      "type": "object",
+      "required": [
+        "base_url",
+        "model"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "base_url": {
+          "type": "string",
+          "pattern": "^https?://"
+        },
+        "model": {
+          "type": "string"
+        },
+        "language": {
+          "type": "string",
+          "description": "Language sent to the server (default: the line language)."
+        },
+        "key_env": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]*$"
         }
       }
     },
