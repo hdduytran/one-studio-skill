@@ -18,7 +18,7 @@ import { renderRatioClips } from "./lib/ratio-render.mjs";
 import { planRender } from "./render-changed-scenes.mjs";
 import { assemble } from "./concat-and-mix.mjs";
 import { loadResearch, sourceIds } from "./lib/research.mjs";
-import { contactSheet } from "./keyframe-stills.mjs";
+import { overviewSheets } from "./lib/contact-sheet.mjs";
 
 const hf = (project, args) => run(process.platform === "win32" ? "npx.cmd" : "npx", ["--yes", `hyperframes@${project.studio.engine.versions?.hyperframes ?? "0.8.181"}`, ...args]);
 
@@ -77,11 +77,10 @@ function sheetFromClips(clips, ids, out) {
     run("ffmpeg", ["-y", "-v", "error", "-ss", String(t), "-i", c, "-frames:v", "1", f]);
     rows.push({ id: ids[i], times: [Math.round(t * 10) / 10], stills: [f] });
   });
-  // One row per scene is too tall for portrait; lay scenes out horizontally instead.
-  const flat = [{ id: "", times: rows.map((r) => r.times[0]), stills: rows.map((r) => r.stills[0]), labels: rows.map((r) => `${r.id} · ${r.times[0]}s`) }];
-  contactSheet(rows.length > 1 ? flat : rows, out, { tileWidth: 360 });
+  // One row per scene is too tall for portrait: a grid, ≤ 12 scenes and ≤ 1200 px per sheet.
+  const sheets = overviewSheets(rows.map((r) => ({ still: r.stills[0], label: `${r.id} · ${r.times[0]}s` })), out, { tileWidth: 360 });
   rmSync(tmp, { recursive: true, force: true });
-  return out;
+  return sheets;
 }
 
 // Research rows cited by storyboard lines, in first-use order → [{ id, name, url, published, accessed }].
@@ -134,8 +133,8 @@ export function publish(dir, { ratios = null, thumb = true, title = null, subtit
     clipsByAspect[aspect] = clips;
     const out = join(outDir, `${name}-${ratioTag(aspect)}.mp4`);
     const r = assemble(project, clips, settings, out, { log });
-    const sheet = sheetFromClips(clips, (project.storyboard?.scenes ?? []).map((s) => s.id), join(clipDir, "..", "sheet.jpg"));
-    deliverables.push({ aspect, path: relative(project.root, out), width: r.video.width, height: r.video.height, duration: r.duration, lufs: r.lufs, sheet: relative(project.root, sheet) });
+    const sheets = sheetFromClips(clips, (project.storyboard?.scenes ?? []).map((s) => s.id), join(clipDir, "..", "sheet.jpg"));
+    deliverables.push({ aspect, path: relative(project.root, out), width: r.video.width, height: r.video.height, duration: r.duration, lufs: r.lufs, sheet: relative(project.root, sheets[0]), ...(sheets.length > 1 && { sheets: sheets.map((f) => relative(project.root, f)) }) });
     log(`✓ ${aspect} → ${relative(project.root, out)}`);
   }
 
