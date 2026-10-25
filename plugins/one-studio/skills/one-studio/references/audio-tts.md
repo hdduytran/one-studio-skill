@@ -37,20 +37,38 @@ Ask once at gate 0, with the user's language:
 - `burn` without libass (Homebrew FFmpeg 8 core): init, `check-external.mjs`, `status.mjs` and `concat-and-mix.mjs` say so, and the video gets `mux` instead. Tell the user once.
 - Changing the mode later: `status.mjs D --captions <mode>` → `build-audio.mjs` → preview/render again.
 
+## Pronunciations (acronyms, brand words)
+Some voices misread capitalised acronyms: ZeroTTS (`quangminh`) swallows the last letter (PHP → "P H", TLS without S, RCE without E) and reads CA as "công an". A letter-by-letter Vietnamese spelling fixes it:
+
+```json
+"pronunciations": { "vi": { "PHP": "pi ếch pi", "PHP-FPM": "pi ếch pi ép pi em", "CA": "xi ây", "TLS": "ti eo ét", "RCE": "a xi i", "CVE": "xi vi i", "CVSS": "xi vi ét ét" } }
+```
+- Where: `brand.json → pronunciations` (a series shares it) and `studio.json → pronunciations` (this project; wins entry by entry). Keys per language (`vi`, `en`, or `default` for all).
+- Applied by `build-audio` to `lines[].text` when the line has no `say`: whole words, case-sensitive (`CA` but not `Ca` or `CAT`), longest key first in one pass, so a compound entry (`PHP-FPM`, `PHP2Shell`) wins over `PHP`. Without its own entry, `PHP` inside `PHP-FPM` is still replaced (`-` separates words; digits and letters do not).
+- Captions and `audio/manifest.json → lines[].text` keep the written text; the manifest adds `spoken` when it differs.
+- The spoken text feeds the TTS cache key and the audio hash: editing an entry re-synthesises only the lines that use it, and `--dry-run` says how many sentences the dictionary changes and how many of them need a call.
+
 ## Before the first TTS call
 `build-audio.mjs D --dry-run` → "N TTS call(s) needed". If `services.tts` is not true, ask ("Gọi ZeroTTS @ <url> cho N câu nhé?"), then run with `--allow-tts` (it records the consent).
 
 ## Build
 `node "$S/scripts/build-audio.mjs" D [--allow-tts]`
-- One call per sentence; cache key = text + model + voice + speed (`audio/cache/`). Editing one sentence → one call.
+- One call per sentence; cache key = spoken text (`say`, else `text` through the pronunciations) + model + voice + speed (`audio/cache/`). Editing one sentence → one call.
 - Leading/trailing silence trimmed (`audio.trim: false` to keep it).
 - Timing per scene: `lead_in` (0.3 s) + sentences separated by `sentence_pause` (0.25 s, per-line `pause_after`) + `scene_padding` (0.5 s).
 - Speaking rate: real voices can read much faster than the 2.8 words/s planning default (ZeroTTS voices measured about 4.5 words/s). `build-audio` stores the voice's measured rate in `studio.json → audio.tts.<lang>.words_per_second` (key `voice`, or `voice@speed`); voice samples fill it first when nothing better exists. `script-lint`, `status --estimate` and storyboard planning use it.
 - A scene is never shortened silently. `build-audio --tighten` proposes VO + 1.2 s (`--pad`) + the scene's scripted `> silence:`; `--tighten --apply` writes `storyboard.json` (the storyboard gate re-opens) and refits scenes from the cached sentences.
 - Scene length = max(storyboard duration, VO + padding). A longer scene gets its `data-duration` rewritten and re-renders; its keyframe approval is kept and gates 5–6 stay closed (they hash the layout only).
-- VO sync: scenes that tag elements with `data-line="<line-id>"` get `<script id="os-lines">` with each line's scene-relative start/end; `S.lines()` reveals them on cue. World scenes (`<link rel="x-world">`) always get the block, since their tagged pieces live in the world file and are timed with `S.line(id)`. Same rule: approvals kept, only those scenes re-render. After adding `data-line` by hand later: `sync-lines.mjs D [ids]`.
+- VO sync: scenes that tag elements with `data-line="<line-id>"` get `<script id="os-lines">` with each line's scene-relative start/end; `S.lines()` reveals them on cue. World scenes (`<link rel="x-world">`) always get the block, since their tagged pieces live in the world file and are timed with `S.line(id)`. Same rule: approvals kept, only those scenes re-render. After adding `data-line` by hand later: `sync-lines.mjs D [ids]`. Both warn about HyperFrames scenes that have VO lines but no `data-line` element (no line timings are written for them).
 - Outputs: `audio/vo.wav`, `captions.srt` (unless `none`; one cue per sentence, wrapped at `brand.captions.max_chars`, two lines max), `audio/manifest.json` with absolute and scene-relative line timings.
 - Spell numbers out in `say` ("thứ tư") and keep digits in `text` ("thứ 4").
+
+## Pronunciation check (speech-to-text, after build-audio)
+You cannot hear the voice-over; a local speech-to-text model can screen it.
+- Configure once: `studio.json → audio.stt.<lang>` = `{ "base_url": "http://localhost:8001", "model": "<model id>", "language": "vi", "key_env": "ONE_STUDIO_STT_KEY" }` (OpenAI-compatible `POST /v1/audio/transcriptions`; `language` defaults to the line's language).
+- Consent like TTS: `check-pronunciation.mjs D --dry-run` → "N speech-to-text call(s) needed"; ask, then `--allow-stt` (records `services.stt`). Transcripts are cached per audio + model in `audio/stt-cache/`.
+- `check-pronunciation.mjs D [line-or-scene-ids] [--all] [--json]` compares each sentence with its transcript: missing / changed words, every dictionary entry (heard written or spelled), capitalised acronyms without an entry, and a duration check (each spelled letter should add ~0.16–0.48 s after the plain words at the voice's measured rate; less means letters were probably swallowed). Report: `review/pronunciation.json`. Exit 2 when lines are flagged.
+- It is screening only: ASR models merge spelled letters ("xi vi i" → "CV") and mishear rare words. Play the flagged sentences to the user and let their ear decide before changing the dictionary.
 
 ## Music (gate 7: ask when `audio.music` is `null`)
 1. `make-music.mjs D --samples [--files a.mp3,b.wav]` → built-in beds in `assets/music/` and 30 s samples with a fade-out in `review/music/*.m4a` (the user's own files too).
