@@ -413,6 +413,10 @@
           ]
         }
       }
+    },
+    "pronunciations": {
+      "description": "Project pronunciations; override the brand (series) kit entry by entry.",
+      "$ref": "#/$defs/pronunciations"
     }
   },
   "$defs": {
@@ -563,6 +567,17 @@
         },
         "duration": {
           "type": "number"
+        }
+      }
+    },
+    "pronunciations": {
+      "description": "Spoken forms per language for build-audio: { \"vi\": { \"PHP\": \"pi ếch pi\" } }. Whole-word, case-sensitive, longest key first; applied to lines[].text when a line has no say. Captions keep the written text.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "string",
+          "minLength": 1
         }
       }
     }

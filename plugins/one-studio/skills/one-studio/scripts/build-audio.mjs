@@ -2,7 +2,9 @@
 // Gate 7: sentence-level voice-over, scene durations fitted to the VO, VO track and captions.
 //   node build-audio.mjs <project-dir> [--allow-tts] [--dry-run]
 //   node build-audio.mjs <project-dir> --tighten [--pad 1.2] [--apply]   shorter storyboard durations from the real VO
-// - One TTS call per storyboard line (cached by text+model+voice+speed in audio/cache/).
+// - One TTS call per storyboard line (cached by spoken text+model+voice+speed in audio/cache/).
+// - Spoken text = lines[].say, else lines[].text with the pronunciation dictionary applied (brand.json / studio.json →
+//   pronunciations.<lang>); captions keep `text`. Editing the dictionary re-synthesises only the lines it changes.
 // - Scene duration = max(storyboard duration, lead-in + sentences + pauses + padding).
 //   HyperFrames scene files get the new data-duration and, when they tag elements with data-line,
 //   the VO line timings (<script id="os-lines">); keyframe approvals carry over (VO-driven changes only).
@@ -16,6 +18,7 @@ import { join } from "node:path";
 import { isMain, loadProject, now, parseArgs, sceneEngine, writeJson } from "./lib/project.mjs";
 import { audioHash, sceneHash, sceneSourceExists } from "./lib/hash.mjs";
 import { buildIndex, sceneFile, writeLineTimes } from "./lib/scenes.mjs";
+import { spokenText } from "./lib/pronounce.mjs";
 import { cacheKey, endpointFor, SAMPLE_RATE, synthLine, voiceFor } from "./lib/tts.mjs";
 import { buildSrt, captionSetting } from "./lib/captions.mjs";
 import { writeAudioCues } from "./lib/sfx.mjs";
@@ -64,12 +67,12 @@ export async function buildAudio(dir, { allowTts = false, dryRun = false, log = 
     (s.lines ?? []).map((l) => {
       const lang = l.lang ?? lang0;
       const v = voiceFor(project, l, lang);
-      const text = l.say ?? l.text;
-      return { scene: s, line: l, lang, v, text, cached: existsSync(join(cacheDir, `${cacheKey(text, v)}.wav`)) };
+      const { text, hits } = spokenText(project, l, lang);
+      return { scene: s, line: l, lang, v, text, hits, cached: existsSync(join(cacheDir, `${cacheKey(text, v)}.wav`)) };
     }),
   );
   const calls = jobs.filter((j) => !j.cached);
-  if (dryRun) return { project, jobs, calls };
+  if (dryRun) return { project, jobs, calls, pronounced: jobs.filter((j) => j.hits.length) };
   if (calls.length && !studio.services?.tts) {
     if (!allowTts) {
       const ep = endpointFor(studio, lang0);
@@ -107,7 +110,7 @@ export async function buildAudio(dir, { allowTts = false, dryRun = false, log = 
     const lines = mine.map((j, i) => {
       const start = local;
       local += j.duration + (i < mine.length - 1 ? j.line.pause_after ?? pause : 0);
-      return { id: j.line.id, start: r3(start), duration: j.duration, file: j.file, text: j.line.text };
+      return { id: j.line.id, start: r3(start), duration: j.duration, file: j.file, text: j.line.text, ...(j.text !== j.line.text && { spoken: j.text }) };
     });
     const voEnd = mine.length ? local + pad : 0;
     const fit = r3(Math.max(s.duration, voEnd));
@@ -210,6 +213,11 @@ if (isMain(import.meta.url)) {
     .then((r) => {
       if (args["dry-run"]) {
         console.log(`${r.jobs.length} sentence(s), ${r.calls.length} TTS call(s) needed, ${r.jobs.length - r.calls.length} cached`);
+        if (r.pronounced.length) {
+          const fresh = r.pronounced.filter((j) => !j.cached).length;
+          const words = [...new Set(r.pronounced.flatMap((j) => j.hits))].join(", ");
+          console.log(`  pronunciations change ${r.pronounced.length} sentence(s) (${words}); ${fresh} of them need a TTS call`);
+        }
         return;
       }
       console.log(`✓ audio/vo.wav ${r.manifest.duration}s, ${r.manifest.captions ?? "no captions (captions: none)"}, ${r.manifest.calls} TTS call(s)`);
