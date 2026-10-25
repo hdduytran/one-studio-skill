@@ -17,7 +17,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { join } from "node:path";
 import { isMain, loadProject, now, parseArgs, sceneEngine, writeJson } from "./lib/project.mjs";
 import { audioHash, sceneHash, sceneSourceExists } from "./lib/hash.mjs";
-import { buildIndex, sceneFile, writeLineTimes } from "./lib/scenes.mjs";
+import { buildIndex, lineSyncWarning, sceneFile, writeLineTimes } from "./lib/scenes.mjs";
 import { spokenText } from "./lib/pronounce.mjs";
 import { cacheKey, endpointFor, SAMPLE_RATE, synthLine, voiceFor } from "./lib/tts.mjs";
 import { buildSrt, captionSetting } from "./lib/captions.mjs";
@@ -72,7 +72,7 @@ export async function buildAudio(dir, { allowTts = false, dryRun = false, log = 
     }),
   );
   const calls = jobs.filter((j) => !j.cached);
-  if (dryRun) return { project, jobs, calls, pronounced: jobs.filter((j) => j.hits.length) };
+  if (dryRun) return { project, jobs, calls, pronounced: jobs.filter((j) => j.hits.length), warnings: lineSyncWarnings(project, scenes) };
   if (calls.length && !studio.services?.tts) {
     if (!allowTts) {
       const ep = endpointFor(studio, lang0);
@@ -171,8 +171,10 @@ export async function buildAudio(dir, { allowTts = false, dryRun = false, log = 
   if (changed.length) buildIndex(project);
   // Line-anchored SFX cues follow the new timings in the studio preview too.
   if (existsSync(join(project.root, "assets", "os.js"))) writeAudioCues(project);
-  return { project, jobs, manifest, changed, rates };
+  return { project, jobs, manifest, changed, rates, warnings: lineSyncWarnings(project, scenes) };
 }
+
+const lineSyncWarnings = (project, scenes) => scenes.map((s) => lineSyncWarning(project, s)).filter(Boolean);
 
 // --tighten: propose (or with apply, write) storyboard durations of VO + pad + scripted silence.
 export async function tighten(dir, { pad, apply = false, log = () => {} } = {}) {
@@ -218,9 +220,11 @@ if (isMain(import.meta.url)) {
           const words = [...new Set(r.pronounced.flatMap((j) => j.hits))].join(", ");
           console.log(`  pronunciations change ${r.pronounced.length} sentence(s) (${words}); ${fresh} of them need a TTS call`);
         }
+        for (const w of r.warnings) console.log(`  ⚠ ${w}`);
         return;
       }
       console.log(`✓ audio/vo.wav ${r.manifest.duration}s, ${r.manifest.captions ?? "no captions (captions: none)"}, ${r.manifest.calls} TTS call(s)`);
+      for (const w of r.warnings) console.log(`  ⚠ ${w}`);
       if (r.changed.length) console.log(`  fitted to the VO (length / line timings): ${r.changed.join(", ")} (these re-render; approvals and gates 5–6 kept)`);
       for (const x of r.rates) console.log(`  speaking rate ${x.lang}/${x.voice}: ${x.wps} words/s (saved in studio.json; script-lint and --estimate use it)`);
       try {
