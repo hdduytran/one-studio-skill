@@ -3,7 +3,11 @@
 // two-pass loudnorm to the target LUFS, captions (none / sidecar / mux / burn: studio.captions, else brand.captions;
 // burn falls back to mux when FFmpeg has no libass). FFmpeg owns the final mix: browser audio is never captured.
 //   node concat-and-mix.mjs <project-dir> [--preview [--ratio 9:16]] [--no-captions]
+//   node concat-and-mix.mjs <project-dir> --draft [--labels]
 // Output: out/<name>.mp4 (or out/<name>-preview.mp4) + out/<name>.srt; recorded in studio.json → outputs.
+// --draft: every scene in draft quality, approved or not (missing draft clips are rendered first, see lib/draft.mjs),
+// mixed as usual → out/<name>-draft.mp4 (-draft-labels.mp4 with --labels). Outside the gates: studio.json is not
+// written. Draft and preview files carry one MP4 chapter per scene.
 // --preview --ratio <export ratio>: a low-res review copy at that ratio (out/<name>-preview-9x16.mp4), so a Shorts /
 // TikTok cut can be checked at gate 8; review only, no gate depends on it. The full-size version comes from publish.
 import { copyFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
@@ -19,6 +23,7 @@ import { ratioTag } from "./lib/variants.mjs";
 import { renderRatioClips } from "./lib/ratio-render.mjs";
 import { effectiveDuration } from "./lib/scenes.mjs";
 import { planRender } from "./render-changed-scenes.mjs";
+import { chapterMetadata, renderDraft, sceneChapters } from "./lib/draft.mjs";
 
 // "#rrggbb" / "rgba(r,g,b,a)" → ASS &HAABBGGRR
 export function assColor(css, fallback = "&H00FFFFFF") {
@@ -161,7 +166,8 @@ function buildMix(project, manifest, dur, tmp, log = () => {}) {
 // Concat clips (already canonical), mix audio, captions → outPath. Shared by concat-and-mix and publish.
 // A clip that does not match the encode (size, fps, codec…) is normalised into a temporary copy for this assembly
 // only; the input clip files are never rewritten (a cached final clip must not silently become a preview one).
-export function assemble(project, clips, settings, outPath, { captions = true, log = () => {} } = {}) {
+// chapters: true → one MP4 chapter per scene (audio manifest timings, else storyboard lengths).
+export function assemble(project, clips, settings, outPath, { captions = true, chapters = false, log = () => {} } = {}) {
   const tmp = join(project.root, ".one-studio", `tmp-mix-${process.pid}`);
   rmSync(tmp, { recursive: true, force: true });
   mkdirSync(tmp, { recursive: true });
@@ -200,6 +206,13 @@ export function assemble(project, clips, settings, outPath, { captions = true, l
     } else {
       args.push("-map", "0:v", "-map", "1:a", "-c:v", "copy");
     }
+    if (chapters) {
+      const meta = join(tmp, "chapters.txt");
+      writeFileSync(meta, chapterMetadata(sceneChapters(project, manifest), dur));
+      const k = args.filter((a) => a === "-i").length;
+      args.splice(args.indexOf("-map"), 0, "-i", meta);
+      args.push("-map_chapters", String(k));
+    }
     // Not -shortest: with a muxed subtitle track it cuts the video at the last caption.
     args.push("-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-t", String(dur), "-movflags", "+faststart", `${outPath}.part.mp4`);
     run("ffmpeg", args);
@@ -235,7 +248,7 @@ export function concatAndMix(dir, { mode = "final", captions = true, log = () =>
   }
   const settings = encodeSettings(project.studio, mode);
   const clips = plan.map((p) => join(project.root, p.clip));
-  const r = assemble(project, clips, settings, outputPath(project, mode), { captions, log });
+  const r = assemble(project, clips, settings, outputPath(project, mode), { captions, chapters: mode === "preview", log });
   project.studio.outputs ??= {};
   project.studio.outputs[mode] = { path: relative(project.root, r.out), hash: gateInputHash(project, { id: mode === "preview" ? "preview" : "render" }), at: now(), duration: Math.round(r.duration * 1000) / 1000 };
   if (mode === "final" && project.brand) project.studio.brand.version = project.brand.version;
@@ -244,19 +257,35 @@ export function concatAndMix(dir, { mode = "final", captions = true, log = () =>
   return { ...r, scenes: plan.length };
 }
 
+// Draft preview outside the gates: renders missing draft clips, assembles the whole video (the VO timeline is the
+// whole video's, so a draft is never partial), never writes studio.json. renderer: see lib/draft.mjs (tests).
+export function draftPreview(dir, { labels = false, captions = true, log = () => {}, renderer = null } = {}) {
+  const project = loadProject(dir);
+  const plan = renderDraft(project, { labels, log, renderer });
+  const settings = encodeSettings(project.studio, "preview");
+  const clips = plan.map((p) => join(project.root, p.clip));
+  const out = outputPath(project, "preview").replace(/-preview\.mp4$/, `-draft${labels ? "-labels" : ""}.mp4`);
+  const r = assemble(project, clips, settings, out, { captions, chapters: true, log });
+  return { ...r, scenes: plan.length, rendered: plan.filter((p) => p.action === "render").length };
+}
+
 if (isMain(import.meta.url)) {
   try {
-    const args = parseArgs(process.argv.slice(2), { flags: ["preview", "no-captions", "help"], options: ["ratio"] });
+    const args = parseArgs(process.argv.slice(2), { flags: ["preview", "draft", "labels", "no-captions", "help"], options: ["ratio"] });
     const dir = args._[0];
     if (args.help || !dir) {
-      console.log("usage: concat-and-mix.mjs <project-dir> [--preview [--ratio 9:16]] [--no-captions]");
+      console.log("usage: concat-and-mix.mjs <project-dir> [--preview [--ratio 9:16]] [--no-captions]\n       concat-and-mix.mjs <project-dir> --draft [--labels]   (outside the gates, studio.json untouched)");
       process.exit(dir ? 0 : 1);
     }
     if (args.ratio && !args.preview) throw new Error("--ratio needs --preview (full-size export ratios come from publish.mjs)");
-    const r = args.ratio
+    if (args.labels && !args.draft) throw new Error("--labels needs --draft (labels never go into a gate preview or the final video)");
+    const r = args.draft
+      ? draftPreview(dir, { labels: args.labels, captions: !args["no-captions"], log: console.log })
+      : args.ratio
       ? ratioPreview(dir, args.ratio, { captions: !args["no-captions"], log: console.log })
       : concatAndMix(dir, { mode: args.preview ? "preview" : "final", captions: !args["no-captions"], log: console.log });
     console.log(`✓ ${r.out}`);
+    if (args.draft) console.log(`  draft (outside the gates, nothing recorded): ${r.rendered} scene(s) rendered, one chapter per scene`);
     console.log(`  ${r.scenes} scenes, ${r.duration.toFixed(2)}s, ${r.video.width}x${r.video.height}@${r.video.fps}, captions: ${r.captions}${r.sfx ? `, ${r.sfx} sfx` : ""}${r.lufs != null ? `, loudness ${r.lufs} LUFS` : ""}`);
   } catch (err) {
     console.error(err.message);

@@ -4,12 +4,17 @@
 //   node render-changed-scenes.mjs <project-dir> [scene-id…] [--preview] [--dry-run] [--json]
 // Clips: out/scenes/<id>-<hash>.mp4 (final) or out/preview/<id>-<hash>.mp4 (--preview, low-res).
 // Exit code 2 when some scenes are blocked (not approved): ask the user to review them first.
+//   node render-changed-scenes.mjs <project-dir> [scene-id…] --draft [--labels] [--dry-run]
+// --draft: every scene in draft quality whether approved or not → out/draft/ (outside the gates: studio.json is not
+// written). --labels: rendered from staged copies with a review label (scene · line · time); sources untouched.
+// Assemble a draft with concat-and-mix.mjs --draft [--labels].
 import { existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { isMain, loadProject, parseArgs } from "./lib/project.mjs";
 import { sceneHash, sceneSourceExists } from "./lib/hash.mjs";
 import { engineFor } from "./lib/engines.mjs";
 import { encodeSettings, normalize, probe } from "./lib/ffmpeg.mjs";
+import { planDraft, renderDraft } from "./lib/draft.mjs";
 
 export function clipPath(project, id, hash, mode) {
   const out = project.studio.render?.out_dir ?? "out";
@@ -73,11 +78,19 @@ export function renderChanged(dir, { ids = [], mode = "final", dryRun = false, l
 
 if (isMain(import.meta.url)) {
   try {
-    const args = parseArgs(process.argv.slice(2), { flags: ["preview", "dry-run", "json", "help"] });
+    const args = parseArgs(process.argv.slice(2), { flags: ["preview", "draft", "labels", "dry-run", "json", "help"] });
     const [dir, ...ids] = args._;
     if (args.help || !dir) {
-      console.log("usage: render-changed-scenes.mjs <project-dir> [scene-id…] [--preview] [--dry-run] [--json]");
+      console.log("usage: render-changed-scenes.mjs <project-dir> [scene-id…] [--preview] [--dry-run] [--json]\n       render-changed-scenes.mjs <project-dir> [scene-id…] --draft [--labels] [--dry-run]");
       process.exit(dir ? 0 : 1);
+    }
+    if (args.labels && !args.draft) throw new Error("--labels needs --draft");
+    if (args.draft) {
+      const project = loadProject(dir);
+      const plan = args["dry-run"] ? planDraft(project, { ids, labels: args.labels }) : renderDraft(project, { ids, labels: args.labels, log: console.log });
+      if (args["dry-run"]) for (const p of plan) console.log(`${p.action.padEnd(8)} ${p.scene.id}${p.reason ? ` (${p.reason})` : ""}`);
+      console.log(`draft: ${plan.filter((p) => p.action === "render").length} rendered/to render, ${plan.filter((p) => p.action === "cached").length} cached (nothing recorded in studio.json)`);
+      process.exit(0);
     }
     const { plan } = renderChanged(dir, { ids, mode: args.preview ? "preview" : "final", dryRun: args["dry-run"], log: args.json ? () => {} : console.log });
     const count = (a) => plan.filter((p) => p.action === a).length;
