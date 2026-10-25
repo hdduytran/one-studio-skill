@@ -159,25 +159,22 @@ function buildMix(project, manifest, dur, tmp, log = () => {}) {
 }
 
 // Concat clips (already canonical), mix audio, captions → outPath. Shared by concat-and-mix and publish.
+// A clip that does not match the encode (size, fps, codec…) is normalised into a temporary copy for this assembly
+// only; the input clip files are never rewritten (a cached final clip must not silently become a preview one).
 export function assemble(project, clips, settings, outPath, { captions = true, log = () => {} } = {}) {
-  const problems = checkClips(clips, settings);
-  if (problems.length) {
-    log(`QA: re-normalising mismatched clips:\n  ${problems.join("\n  ")}`);
-    for (const c of new Set(problems.map((p) => p.split(":")[0]))) {
-      const tmp = `${c}.renorm.mp4`;
-      normalize(c, tmp, settings);
-      copyFileSync(tmp, c);
-      rmSync(tmp);
-    }
-    const again = checkClips(clips, settings);
-    if (again.length) throw new Error(`Clips still differ after normalising:\n  ${again.join("\n  ")}`);
-  }
-
   const tmp = join(project.root, ".one-studio", `tmp-mix-${process.pid}`);
   rmSync(tmp, { recursive: true, force: true });
   mkdirSync(tmp, { recursive: true });
   try {
-    const video = concatCopy(clips, join(tmp, "video.mp4"));
+    let inputs = clips;
+    const problems = checkClips(clips, settings);
+    if (problems.length) {
+      log(`QA: mismatched clips are re-encoded to ${settings.width}x${settings.height}@${settings.fps} for this assembly (the clip files stay as they are):\n  ${problems.join("\n  ")}`);
+      inputs = clips.map((c, i) => (checkClips([c], settings).length ? normalize(c, join(tmp, `norm-${String(i).padStart(3, "0")}.mp4`), settings) : c));
+      const again = checkClips(inputs, settings);
+      if (again.length) throw new Error(`Clips still differ after normalising:\n  ${again.join("\n  ")}`);
+    }
+    const video = concatCopy(inputs, join(tmp, "video.mp4"));
     const dur = probe(video).duration;
 
     const manifest = readAudioManifest(project);
