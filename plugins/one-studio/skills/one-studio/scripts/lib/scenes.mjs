@@ -157,6 +157,17 @@ const labelled = (scene) => (scene.lines ?? []).some((l) => l.kind === "opinion"
 export const usesLineSync = (html) =>
   /\bdata-line\s*=/.test(html) || LINES_RE.test(html) || /<link\b[^>]*\brel\s*=\s*["']x-world["']/i.test(html);
 
+// A HyperFrames scene with VO lines but no data-line element (and no world) gets no real line timings:
+// S.line() / S.lines() fall back to their guesses, so reveals drift from the voice. Warn, never fail.
+export function lineSyncWarning(project, scene) {
+  if (!scene.lines?.length || sceneEngine(scene, project.studio) !== "hyperframes") return null;
+  const file = sceneFile(project, scene.id);
+  if (!existsSync(file)) return null;
+  const html = readFileSync(file, "utf8");
+  if (/\bdata-line\s*=/.test(html) || /<link\b[^>]*\brel\s*=\s*["']x-world["']/i.test(html)) return null;
+  return `${scene.id}: no data-line element, so no VO line timings are written (tag the element for each sentence with data-line="${scene.lines[0].id}" …)`;
+}
+
 // Text of the chip shown while a line is spoken: "Ý KIẾN" / "OPINION", or "speaker · source name" for quotes.
 export function lineLabel(line, language, research = []) {
   if (line?.kind === "opinion") return language === "vi" ? "Ý KIẾN" : "OPINION";

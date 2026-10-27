@@ -7,17 +7,21 @@
 import { isMain, loadProject, parseArgs } from "./lib/project.mjs";
 import { readAudioManifest } from "./lib/gates.mjs";
 import { sceneHash, sceneSourceExists } from "./lib/hash.mjs";
-import { writeLineTimes } from "./lib/scenes.mjs";
+import { lineSyncWarning, writeLineTimes } from "./lib/scenes.mjs";
 
+// -> { changed: [scene ids], warnings: [scenes with VO lines but no data-line element] }
 export function syncLines(dir, ids = []) {
   const project = loadProject(dir);
   const manifest = readAudioManifest(project);
   if (!manifest) throw new Error("no audio/manifest.json yet: run build-audio.mjs first");
   const timing = new Map(manifest.scenes.map((s) => [s.id, s.lines ?? []]));
   const changed = [];
+  const warnings = [];
   for (const scene of project.storyboard?.scenes ?? []) {
     if (ids.length && !ids.includes(scene.id)) continue;
     if (!sceneSourceExists(project, scene) || !timing.has(scene.id)) continue;
+    const warning = lineSyncWarning(project, scene);
+    if (warning) warnings.push(warning);
     const before = sceneHash(project, scene);
     if (!writeLineTimes(project, scene, timing.get(scene.id))) continue;
     const after = sceneHash(project, scene);
@@ -26,7 +30,7 @@ export function syncLines(dir, ids = []) {
     changed.push(scene.id);
   }
   project.save();
-  return changed;
+  return { changed, warnings };
 }
 
 if (isMain(import.meta.url)) {
@@ -37,7 +41,8 @@ if (isMain(import.meta.url)) {
       console.log("usage: sync-lines.mjs <project-dir> [scene-id…]");
       process.exit(dir ? 0 : 1);
     }
-    const changed = syncLines(dir, ids);
+    const { changed, warnings } = syncLines(dir, ids);
+    for (const w of warnings) console.log(`⚠ ${w}`);
     console.log(changed.length ? `✓ line timings written: ${changed.join(", ")} (approvals kept; re-render these scenes)` : "· nothing to sync (no data-line elements, or timings unchanged)");
   } catch (err) {
     console.error(err.message);

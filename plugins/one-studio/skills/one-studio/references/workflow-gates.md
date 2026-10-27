@@ -70,6 +70,7 @@ Marks printed by status: `✓` done · `→` current · `!` input changed after 
   - Other ratios in `format.exports` are captured too (one middle frame per scene → `review/sheet-<ratio>.jpg`). Fix portrait/square layout now with `<style data-ratio="9:16">` blocks: they are hashed for that ratio only, so the main-ratio approval and clips stay valid. These sheets are for review; approval follows the main ratio.
   - Same-world and `handoff` pairs also get `review/seams.jpg` (last frame of A beside first of B, with the pixel difference). Same-world seams above 2% are warnings here: fix the camera/state so the scenes meet, then re-run `seam-check.mjs D [--pairs s01:s02] [--threshold 0.02]` (exit 1 on a bad seam). Handoff differences are for the eye.
   - Without FFmpeg drawtext the sheets have no labels: rows/tiles are in storyboard order; say so when you show them.
+  - Sheets hold at most 12 scenes and are ≤ 1200 px wide: a longer video gets `review/sheet-1.jpg`, `sheet-2.jpg` … (show each). To look at a moment between the default frames: `keyframe-stills.mjs D s07 --at 12.4,13.6` → `review/sheet-at.jpg` (no approval changes).
 - **Ask:** show the sheet path(s) (and the images if the client can display them), list scenes you are unsure about: "Bạn duyệt các scene này chứ? Scene nào cần sửa? (bản dọc 9:16 ở `review/sheet-9x16.jpg`)"
 - **Close:** `status.mjs D --approve-scenes s01,s02` for the approved ones (or `all`), then `--approve keyframes` once every scene is approved. A later edit to a scene clears only its approval.
 
@@ -84,8 +85,10 @@ Marks printed by status: `✓` done · `→` current · `!` input changed after 
 - **Music** (when `studio.json → audio.music` is `null`): `make-music.mjs D --samples` → `audio-picker.mjs D` → show `review/audio-picker.html` (and the `review/music/*.m4a` paths). Ask: "Bạn chọn nhạc nền nào: ambient, ambient-bright, lofi, lofi-dark, file của bạn, hay không nhạc?" → `make-music.mjs D --use <bed|path|none>`.
 - **Captions** (re-ask only if the user wants to change the gate 0 answer): "Giữ phụ đề <mode> chứ?" → `status.mjs D --captions <mode>`.
 - **SFX** (optional): add `scenes[].sfx[]` cues to the storyboard (`references/audio-tts.md`); the picker page lists the built-in kit.
-- `build-audio.mjs D --dry-run` → number of TTS calls. If `services.tts` is not true, ask once; then `build-audio.mjs D --allow-tts`.
-- It fits scene lengths to the VO and writes `data-line` reveal timings into scenes that use them (approvals kept, gates 5–6 stay ✓), writes `audio/vo.wav`, `captions.srt` (unless captions are `none`), `audio/manifest.json`, and the voice's measured speaking rate. Scenes it changed re-render at gate 8 (`render-changed-scenes --preview`).
+- **Acronyms and brand words:** before the first TTS call, scan the lines for capitalised acronyms (PHP, CA, TLS, CVE…). Voices often swallow the last letter or read them as words; add spoken forms to `pronunciations.<lang>` in `brand.json` (shared by a series) or `studio.json` (this project only), e.g. `{"vi": {"PHP": "pi ếch pi", "CA": "xi ây"}}`. Captions keep the written text. `say` on a line still wins.
+- `build-audio.mjs D --dry-run` → number of TTS calls (and how many come from the dictionary). If `services.tts` is not true, ask once; then `build-audio.mjs D --allow-tts`.
+- **Pronunciation check** (when `audio.stt` is configured): ask "Gửi N câu tới máy nhận dạng giọng nói <url> để soát cách đọc nhé?" → `check-pronunciation.mjs D --allow-stt` → read the ✗ lines (missing words, dictionary entries not recognised, acronyms without an entry, too-short spelled letters). ASR merges spelled letters, so it only screens: play the flagged sentences to the user (each ✗ line prints its wav path; also in `review/pronunciation.json`) and let them decide before editing the dictionary.
+- It fits scene lengths to the VO and writes `data-line` reveal timings into scenes that use them (approvals kept, gates 5–6 stay ✓; a scene with VO lines but no `data-line` element is warned about), writes `audio/vo.wav`, `captions.srt` (unless captions are `none`), `audio/manifest.json`, and the voice's measured speaking rate. Scenes it changed re-render at gate 8 (`render-changed-scenes --preview`).
 - It only ever lengthens a scene. When it prints `⚠ … longer than their voice-over`: `build-audio.mjs D --tighten` → show the table (storyboard, VO, silence, proposed = VO + 1.2 s + silence; `--pad` to change). Ask: "Rút ngắn các scene theo bảng này chứ? Storyboard sẽ cần duyệt lại." On OK → `--tighten --apply` (writes `storyboard.json`, refits scenes from the cached VO, no TTS call), then re-approve storyboard and estimate; keyframe approvals stay.
 - **Close:** `--approve audio` (refuses while music is undecided or the audio is stale).
 
@@ -93,7 +96,12 @@ Marks printed by status: `✓` done · `→` current · `!` input changed after 
 
 - `render-changed-scenes.mjs D --preview` then `concat-and-mix.mjs D --preview` → `out/<name>-preview.mp4` (540p, VO, music, captions, −14 LUFS).
 - Export ratios (always when `format.platforms` has shorts/tiktok/reels): `concat-and-mix.mjs D --preview --ratio 9:16` → `out/<name>-preview-9x16.mp4` (540×960, same audio and captions). Review only; fixes go into `<style data-ratio="9:16">` blocks.
+- The preview has one MP4 chapter per scene, so the user can jump to a scene in the player.
 - **Ask:** send the path; collect scene-level fixes. Fixes → back to gate 5 for those scenes only.
+
+### Draft preview outside the gates (any time)
+
+When the user wants to watch the whole video before every gate is approved: `concat-and-mix.mjs D --draft [--labels]` renders every scene in draft quality (approved or not; cached in `out/draft/`) and mixes it like a preview → `out/<name>-draft.mp4` (`-draft-labels.mp4`). Nothing is approved or recorded in `studio.json`. `--labels` draws `scene · title │ VO line │ +s in scene │ ▶ time in video` on every HyperFrames scene (staged copies; sources untouched), so the user can name exact moments in their feedback. Chapters per scene. Never offer it as the gate 8 preview.
 - **Close:** after OK → `--approve preview`.
 
 ## 9 · Render
