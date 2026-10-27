@@ -78,6 +78,17 @@ test("stderr samples map to the right failure class", () => {
   assert.match(yt.classifyError("Unable to extract x").message, /yt-dlp -U/);
 });
 
+test("a subtitle failure is not a network error, and the real yt-dlp line is always shown", () => {
+  const subs429 = "[info] x: Downloading subtitles: vi\nERROR: Unable to download video subtitles for 'vi-orig': HTTP Error 429: Too Many Requests";
+  assert.ok(yt.isSubtitleError(subs429));
+  assert.ok(!yt.isSubtitleError("ERROR: Read timed out"));
+  const c = yt.classifyError(subs429);
+  assert.equal(c.kind, "rate-limit");
+  assert.match(c.message, /yt-dlp: ERROR: Unable to download video subtitles/);
+  assert.equal(yt.classifyError("ERROR: Unable to download webpage: HTTP Error 404: Not Found").kind, "extractor");
+  assert.ok(!yt.buildArgs({ url: "https://a/b", dir: "/x", from: 0, to: 9, subs: false }).includes("--write-auto-subs"));
+});
+
 test("platform detection and info filtering", () => {
   assert.equal(yt.platformOf("Youtube", "https://youtu.be/a"), "youtube");
   assert.equal(yt.platformOf("TikTok", "https://vm.tiktok.com/a"), "tiktok");
@@ -143,8 +154,9 @@ const out = a[a.indexOf("-o") + 1].replace("%(ext)s", "mp4");
 const base = out.slice(0, -".mp4".length);
 if (a.includes("--cookies") || a.some((x) => x.startsWith("--cookies"))) process.exit(3);
 if (process.env.STUB_FAIL) { console.error("ERROR: Sign in to confirm your age"); process.exit(1); }
+if (process.env.STUB_SUBS_429 && a.includes("--write-auto-subs")) { console.error("ERROR: Unable to download video subtitles for 'vi': HTTP Error 429: Too Many Requests"); process.exit(1); }
 spawnSync("ffmpeg", ["-nostdin", "-y", "-v", "error", "-f", "lavfi", "-i", "color=c=red:s=320x180:r=10", "-t", "4", "-pix_fmt", "yuv420p", out]);
-writeFileSync(base + ".en.vtt", "WEBVTT\\n");
+if (a.includes("--write-subs")) writeFileSync(base + ".en.vtt", "WEBVTT\\n");
 writeFileSync(base + ".info.json", JSON.stringify({ title: "Hello World", uploader: "Chan", webpage_url: "https://www.tiktok.com/@c/video/1", duration: 200, extractor: "TikTok", width: 320, height: 180, http_headers: { Cookie: "x" } }));
 `);
   chmodSync(bin, 0o755);
@@ -163,11 +175,16 @@ writeFileSync(base + ".info.json", JSON.stringify({ title: "Hello World", upload
   assert.ok(existsSync(join(sdir, "subs.vtt")) && existsSync(join(sdir, "source.mp4")));
   assert.equal(JSON.stringify(info).includes("Cookie"), false);
   assert.deepEqual(readdirNames(sdir), ["info.json", "source.mp4", "subs.vtt"]);
+  // Auto-subs rate-limited: the video still arrives, without subtitles, and the reason is printed.
+  const noSubs = fetchCli({ ONE_STUDIO_YTDLP: bin, STUB_SUBS_429: "1" }, dir, url, "--slug", "no-subs", "--from", "0:05", "--to", "0:09");
+  assert.equal(noSubs.code, 0, noSubs.err);
+  assert.match(noSubs.out, /subtitles skipped.*429/);
+  assert.equal(readJson(join(dir, "style-refs", "no-subs", "info.json")).subs, false);
   // Failure leaves nothing behind and speaks the login advice.
   const bad = fetchCli({ ONE_STUDIO_YTDLP: bin, STUB_FAIL: "1" }, dir, url);
   assert.equal(bad.code, 1);
   assert.match(bad.err, /đường dẫn file/);
-  assert.deepEqual(readdirNames(join(dir, "style-refs")).filter((n) => n !== ".gitignore"), [slug]);
+  assert.deepEqual(readdirNames(join(dir, "style-refs")).filter((n) => n !== ".gitignore"), [slug, "no-subs"]);
 });
 
 test("neededTools asks for yt-dlp only while a linked reference has no footage", () => {

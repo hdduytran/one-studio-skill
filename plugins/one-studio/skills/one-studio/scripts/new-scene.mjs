@@ -1,14 +1,20 @@
 #!/usr/bin/env node
 // Scaffold scenes/<id>.html from its storyboard entry and the type template (HyperFrames scenes only).
 // Existing files are kept unless --force. Then edit content/timeline; never restyle with literal colours.
-//   node new-scene.mjs <project-dir> <scene-id|--all> [--force]
+//   node new-scene.mjs <project-dir> <scene-id…|--all> [--force] [--kit <kit> [--component <name>]]
+// --kit copies <library>/kits/<kit>/kit.css into the scene (<style data-kit>); on an existing scene it only
+// refreshes that block. --component starts a new scene (or --force) from one of the kit's components.
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { TEMPLATE_DIR, isMain, loadProject, parseArgs, sceneEngine } from "./lib/project.mjs";
 import { buildIndex, effectiveDuration, renderSceneTemplate, sceneFile } from "./lib/scenes.mjs";
+import { findLibrary } from "./lib/library.mjs";
+import { loadKit, withKit } from "./lib/kits.mjs";
 
-export function newScenes(dir, ids, { force = false } = {}) {
+export function newScenes(dir, ids, { force = false, kit: kitName = null, component = null } = {}) {
   const project = loadProject(dir);
+  if (component && !kitName) throw new Error("--component needs --kit <kit>");
+  const kit = kitName ? loadKit(findLibrary(project.root), kitName) : null;
   const scenes = project.storyboard?.scenes ?? [];
   const pick = ids === "all" ? scenes.filter((s) => sceneEngine(s, project.studio) !== "remotion") : ids.map((id) => {
     const s = scenes.find((x) => x.id === id);
@@ -26,11 +32,16 @@ export function newScenes(dir, ids, { force = false } = {}) {
     const path = sceneFile(project, scene.id);
     if (scene.world) ensureWorldFile(project, scene.world);
     if (existsSync(path) && !force) {
-      out.push({ id: scene.id, path, created: false });
+      if (kit && !component) {
+        const html = readFileSync(path, "utf8");
+        const next = withKit(html, kit);
+        if (next !== html) writeFileSync(path, next);
+        out.push({ id: scene.id, path, created: false, kit: next !== html ? "refreshed" : "unchanged" });
+      } else out.push({ id: scene.id, path, created: false });
       continue;
     }
-    writeFileSync(path, renderSceneTemplate(project, scene));
-    out.push({ id: scene.id, path, created: true });
+    writeFileSync(path, renderSceneTemplate(project, scene, { kit, component }));
+    out.push({ id: scene.id, path, created: true, kit: kit ? "added" : null });
   }
   buildIndex(project);
   return out;
@@ -61,14 +72,15 @@ function newLemoScene(project, scene, force) {
 
 if (isMain(import.meta.url)) {
   try {
-    const args = parseArgs(process.argv.slice(2), { flags: ["all", "force", "help"] });
+    const args = parseArgs(process.argv.slice(2), { flags: ["all", "force", "help"], options: ["kit", "component"] });
     const [dir, ...ids] = args._;
     if (args.help || !dir || (!args.all && !ids.length)) {
-      console.log("usage: new-scene.mjs <project-dir> <scene-id…|--all> [--force]");
+      console.log("usage: new-scene.mjs <project-dir> <scene-id…|--all> [--force] [--kit <kit> [--component <name>]]\n       kits and components: library.mjs <project-dir> --kits");
       process.exit(args.help ? 0 : 1);
     }
-    for (const r of newScenes(dir, args.all ? "all" : ids, { force: args.force })) {
-      console.log(`${r.created ? "✓ created" : "· kept   "} ${r.path}`);
+    for (const r of newScenes(dir, args.all ? "all" : ids, { force: args.force, kit: args.kit, component: args.component })) {
+      const kitNote = r.kit === "refreshed" ? ` (kit ${args.kit} styles refreshed: the scene re-opens for review)` : r.kit === "unchanged" ? ` (kit ${args.kit} already current)` : r.kit === "added" ? ` (kit ${args.kit}${args.component ? `, component ${args.component}` : ""})` : "";
+      console.log(`${r.created ? "✓ created" : "· kept   "} ${r.path}${kitNote}`);
     }
   } catch (err) {
     console.error(err.message);

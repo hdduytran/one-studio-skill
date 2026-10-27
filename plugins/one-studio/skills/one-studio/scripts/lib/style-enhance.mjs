@@ -6,14 +6,15 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { deltaE2000, hexToOklch, oklchToHex } from "./color.mjs";
-import { AA_LARGE, AA_TEXT, contrastIssues, fixContrast, solidHex } from "./style-contrast.mjs";
+import { AA_LARGE, AA_TEXT, contrastIssues, fixContrast, fixContrastOn, solidHex } from "./style-contrast.mjs";
 import { PART_KINDS } from "./style-enhance-parts.mjs";
 import { supportsVietnamese, vietnameseSibling } from "./style-fonts.mjs";
 import { SERIES_OWNED, clone, deletePath, effectiveStyle, getPath, isLocked, layerUnits, lockedOf, provenanceKeys, readLayer, setPath, unitOf } from "./style-layers.mjs";
 import { mergeBrandPatch, styleDir } from "./style-refs.mjs";
 
-// Safe areas of TikTok / Reels chrome as fractions of the frame, and the average sentence length used for pacing.
-export const UI_ZONE = { bottom: 0.2, right: 0.12 };
+// Safe areas of TikTok / Reels chrome (lib/platforms.mjs), and the average sentence length used for pacing.
+import { UI_ZONE } from "./platforms.mjs";
+export { UI_ZONE };
 export const WORDS_PER_SENTENCE = 12;
 export const SERIES_COLOR_MIN_DELTA_E = 8;
 const CAPTION_CHAR_WIDTH = 0.55; // average glyph width in em
@@ -61,10 +62,14 @@ function contrast(ctx) {
   const issues = contrastIssues(colors, captions);
   const patch = {};
   const lines = [];
-  for (const i of issues) {
-    const fixed = fixContrast(solidHex(i.fg, i.bg), i.bg, i.min);
-    setPath(patch, `brand.${i.token}`, fixed);
-    lines.push(`${i.token.split(".")[1]} ${r2(i.ratio)} < ${i.min}`);
+  // A text colour checked on both the page and the card surface gets one value that reads on both;
+  // colors.surface is never a token here (it is a fill, not text).
+  for (const token of [...new Set(issues.map((i) => i.token))]) {
+    const mine = issues.filter((i) => i.token === token);
+    const min = Math.max(...mine.map((i) => i.min));
+    const bgs = token.startsWith("colors.") ? [...new Set([solidHex(colors.bg), ...(colors.surface && ["colors.fg", "colors.muted"].includes(token) ? [solidHex(colors.surface, solidHex(colors.bg))] : [])])] : [mine[0].bg];
+    setPath(patch, `brand.${token}`, fixContrastOn(solidHex(mine[0].fg, mine[0].bg), bgs, min));
+    for (const i of mine) lines.push(`${token.split(".")[1]}${i.on === "surface" ? " on surface" : ""} ${r2(i.ratio)} < ${i.min}`);
   }
   const p = permitted(ctx, patch);
   if (!p) return null;
@@ -189,6 +194,12 @@ function variantRule(ctx) {
   const name = b.L < 0.5 ? "light" : "dark";
   if (ctx.hasVariant(name)) return null;
   const colors = name === "light" ? { bg: oklch(0.97, Math.min(b.C, 0.02), b.h), fg: oklch(Math.min(Math.max(1 - f.L, 0.2), 0.3), f.C, f.h) } : { bg: oklch(0.18, Math.min(b.C, 0.03), b.h), fg: oklch(Math.max(Math.min(1 - f.L, 0.97), 0.9), Math.min(f.C, 0.02), f.h) };
+  // Cards follow the page: a near-white panel on the light side, a raised dark panel on the dark side.
+  const sf = solidHex(c.surface);
+  if (sf) {
+    const s = hexToOklch(sf);
+    colors.surface = name === "light" ? oklch(0.99, Math.min(s.C, 0.02), s.h) : oklch(0.25, Math.min(s.C, 0.03), s.h);
+  }
   for (const role of ["primary", "secondary", "accent", "muted"]) {
     const hex = solidHex(c[role]);
     if (!hex) continue;

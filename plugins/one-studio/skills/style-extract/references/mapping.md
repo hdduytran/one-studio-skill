@@ -7,6 +7,7 @@
 |---|---|
 | `bg` | the cluster flagged `bg` (largest at the frame border) |
 | `fg` | highest WCAG contrast against `bg`, at least 4.5:1; otherwise black/white and `guessed` |
+| `surface` (optional) | card / panel fill: weight >= 5 %, chroma < 0.08, contrast with bg < 3:1 but dE2000 >= 5 from it, and `fg` reads on it (4.5:1); the heaviest one. Picked before the accents, so a cream card on a lavender page never becomes `primary` |
 | `primary`, `secondary`, `accent` | clusters with OKLCH chroma >= 0.08, ranked by weight x chroma; each at least dE2000 15 from bg, fg and one another; none left means the role is left out |
 | `muted` | chroma <= 0.06 and lightness between bg and fg, nearest the middle |
 

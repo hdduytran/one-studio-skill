@@ -4,7 +4,7 @@
 //   brand.json        the style's brand patch merged over it (section by section), version +1 (unchanged when the brand already matches)
 //   studio.json       story.style = {slug, variant?}; story.format / story.tone only when still empty
 //   style-refs/<slug>/hints.json   storyboard / audio / writing hints that gates 3 and 7 read
-//   --as-preset       also saves the look to ${ONE_STUDIO_CACHE}/presets/<name>.json (usable by init-project --preset)
+//   --as-preset       also saves the look to <library>/presets/<name>.json (lib/library.mjs; usable by init-project --preset)
 //   cleanup           source.* and frames/ are deleted unless --keep (or the fetch recorded keep: true)
 //   contrast          text/background pairs under WCAG AA refuse the apply (nothing written) unless --allow-low-contrast
 // The script never asks anything: SKILL.md has Claude confirm first, and a version bump re-opens every
@@ -13,7 +13,7 @@ import { existsSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { isMain, loadProject, parseArgs, readJson, validateKind, writeJson } from "./lib/project.mjs";
 import { mergeBrandPatch, resolveStyle, styleContentHash, styleDir } from "./lib/style-refs.mjs";
-import { PRESET_EXTRA_SECTIONS, assertCachePresetName, loadPresets, saveCachePreset } from "./lib/presets.mjs";
+import { PRESET_EXTRA_SECTIONS, assertPresetName, loadPresets, savePreset } from "./lib/presets.mjs";
 import { sceneHash, sceneSourceExists } from "./lib/hash.mjs";
 import { stripUserinfo } from "./lib/ytdlp.mjs";
 import { contrastIssues } from "./lib/style-contrast.mjs";
@@ -63,7 +63,7 @@ function cleanupSource(sd, keep) {
 }
 
 export function applyStyle(dir, slug, { variant, asPreset, keep = false, dryRun = false, allowLowContrast = false } = {}) {
-  if (asPreset) assertCachePresetName(asPreset);
+  if (asPreset) assertPresetName(asPreset);
   const project = loadProject(dir);
   if (!project.brand) throw new Error("brand.json not found; run init-project.mjs first");
   const style = resolveStyle(project, slug, { variant });
@@ -95,7 +95,7 @@ export function applyStyle(dir, slug, { variant, asPreset, keep = false, dryRun 
 
   // Pairs under WCAG AA once applied. Refused unless the user knowingly accepts them: the fix is the contrast
   // proposal of style-enhance or other colours.
-  const contrast = contrastIssues(brand.colors, brand.captions).map((i) => `${i.token} ${i.ratio.toFixed(1)} < ${i.min}`);
+  const contrast = contrastIssues(brand.colors, brand.captions).map((i) => `${i.token}${i.on === "surface" ? " on surface" : ""} ${i.ratio.toFixed(1)} < ${i.min}`);
   if (contrast.length && !allowLowContrast) {
     throw new Error(`Refused: text/background pairs below WCAG AA (${contrast.join(", ")}). Accept the "contrast" proposal (style-enhance.mjs ${dir} ${slug} lists it; then --accept contrast) or set other colours with style-set.mjs; pass --allow-low-contrast only if the user insists. Nothing was written.`);
   }
@@ -109,7 +109,7 @@ export function applyStyle(dir, slug, { variant, asPreset, keep = false, dryRun 
     contrast };
   if (dryRun) return result;
 
-  if (asPreset) result.preset = saveCachePreset(asPreset, presetEntry(style, sd));
+  if (asPreset) result.preset = savePreset(asPreset, presetEntry(style, sd), { from: project.root });
   writeJson(project.brandPath, brand);
   project.studio = studio;
   project.save();

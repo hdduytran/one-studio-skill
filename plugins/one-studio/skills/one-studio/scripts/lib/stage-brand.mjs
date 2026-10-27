@@ -7,6 +7,7 @@ import { ENGINE_VERSIONS, TEMPLATE_DIR, linkSharedDirs } from "./project.mjs";
 import { run } from "./ffmpeg.mjs";
 import { vendorGsap, vendorHowler } from "./vendor.mjs";
 import { brandToCss } from "../brand-to-css.mjs";
+import { stripRatioStyles } from "./hash.mjs";
 
 // Generated per brand, so never linked from the project.
 const OWN = new Set(["brand.css", "brand.js", "fonts", "brand"]);
@@ -25,9 +26,10 @@ function ensureRuntime(assets) {
   if (!existsSync(join(assets, "audio-cues.js"))) writeFileSync(join(assets, "audio-cues.js"), "window.OS_CUES = {};\n");
 }
 
-// scenes: [{ id, file }] (copied) or [{ id, html }] (written). Returns { root, warning }.
+// scenes: [{ id, file }] (copied) or [{ id, html }] (written), with only `aspect`'s <style data-ratio> blocks
+// left in (default: the project's ratio). Returns { root, warning }.
 // Fonts that cannot be fetched fall back to the system stack with a warning, unless `offline` (then it throws).
-export function stageBrand(project, { root, brand, scenes, offline = false, label = brand.name }) {
+export function stageBrand(project, { root, brand, scenes, offline = false, label = brand.name, aspect = project.studio.format.aspect }) {
   rmSync(root, { recursive: true, force: true });
   const assets = join(root, "assets");
   mkdirSync(join(root, "scenes"), { recursive: true });
@@ -46,8 +48,8 @@ export function stageBrand(project, { root, brand, scenes, offline = false, labe
   }
   ensureRuntime(assets);
   for (const s of scenes) {
-    if (s.html !== undefined) writeFileSync(join(root, "scenes", `${s.id}.html`), s.html);
-    else copyFileSync(s.file, join(root, "scenes", `${s.id}.html`));
+    const html = s.html !== undefined ? s.html : readFileSync(s.file, "utf8");
+    writeFileSync(join(root, "scenes", `${s.id}.html`), stripRatioStyles(html, aspect));
   }
   const hf = join(project.root, "hyperframes.json");
   writeFileSync(join(root, "hyperframes.json"), existsSync(hf) ? readFileSync(hf) : "{}\n");

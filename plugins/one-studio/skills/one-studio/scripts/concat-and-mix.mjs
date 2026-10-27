@@ -2,16 +2,21 @@
 // Assemble the video: concat scene clips (stream copy, storyboard order), mix VO + music (ducked) + SFX cues,
 // two-pass loudnorm to the target LUFS, captions (none / sidecar / mux / burn: studio.captions, else brand.captions;
 // burn falls back to mux when FFmpeg has no libass). FFmpeg owns the final mix: browser audio is never captured.
-//   node concat-and-mix.mjs <project-dir> [--preview] [--no-captions]
+//   node concat-and-mix.mjs <project-dir> [--preview [--ratio 9:16]] [--no-captions]
 // Output: out/<name>.mp4 (or out/<name>-preview.mp4) + out/<name>.srt; recorded in studio.json → outputs.
+// --preview --ratio <export ratio>: a low-res review copy at that ratio (out/<name>-preview-9x16.mp4), so a Shorts /
+// TikTok cut can be checked at gate 8; review only, no gate depends on it. The full-size version comes from publish.
 import { copyFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import { isMain, loadProject, now, parseArgs } from "./lib/project.mjs";
+import { ASPECTS, isMain, loadProject, now, parseArgs } from "./lib/project.mjs";
 import { audioHash } from "./lib/hash.mjs";
 import { gateInputHash, outputPath, readAudioManifest } from "./lib/gates.mjs";
 import { checkClips, concatCopy, encodeSettings, hasLibass, normalize, probe, run } from "./lib/ffmpeg.mjs";
 import { captionMode } from "./lib/captions.mjs";
 import { placeCues, sfxCues } from "./lib/sfx.mjs";
+import { UI_ZONE, captionSafe } from "./lib/platforms.mjs";
+import { ratioTag } from "./lib/variants.mjs";
+import { renderRatioClips } from "./lib/ratio-render.mjs";
 import { effectiveDuration } from "./lib/scenes.mjs";
 import { planRender } from "./render-changed-scenes.mjs";
 
@@ -30,12 +35,14 @@ export function assColor(css, fallback = "&H00FFFFFF") {
 
 // libass styles for .srt live in a 384×288 script space scaled to the video height; brand sizes are px
 // at 1080 on the short side, so portrait videos keep the same on-screen size relative to the width.
-export function captionStyle(brand, width = 1920, height = 1080) {
+// safe: keep clear of the Shorts / TikTok / Reels UI (bottom 20 %, right rail 12 %).
+export function captionStyle(brand, width = 1920, height = 1080, { safe = false } = {}) {
   const c = brand?.captions ?? {};
   // Phones show portrait video full-screen: captions a bit larger there.
   const k = (288 / height) * (Math.min(width, height) / 1080) * (height > width * 1.2 ? 1.35 : 1);
   const size = Math.round((c.size ?? 44) * k * 10) / 10;
-  const margin = Math.round(288 * 0.06);
+  const margin = Math.round(288 * (safe ? UI_ZONE.bottom + 0.03 : 0.06));
+  const side = safe ? Math.round(384 * UI_ZONE.right) : null;
   const align = { bottom: 2, middle: 5, top: 8 }[c.position ?? "bottom"];
   return [
     `FontName=${(c.font ?? brand?.typography?.body?.family ?? "Sans").replace(/[,']/g, "")}`,
@@ -48,6 +55,7 @@ export function captionStyle(brand, width = 1920, height = 1080) {
     "Shadow=0",
     `Alignment=${align}`,
     `MarginV=${margin}`,
+    ...(side ? [`MarginL=${side}`, `MarginR=${side}`] : []),
     `Bold=${(brand?.typography?.body?.weight ?? 400) >= 600 ? 1 : 0}`,
   ].join(",");
 }
@@ -187,7 +195,7 @@ export function assemble(project, clips, settings, outPath, { captions = true, l
     const args = ["-y", "-v", "error", "-i", video, "-i", mix.file];
     if (capMode === "burn") {
       const fonts = join(project.root, "assets", "fonts");
-      const style = captionStyle(project.brand, settings.width, settings.height);
+      const style = captionStyle(project.brand, settings.width, settings.height, { safe: captionSafe(project, settings.width, settings.height) });
       const vf = `subtitles='${filterPath(srt)}'${existsSync(fonts) ? `:fontsdir='${filterPath(fonts)}'` : ""}:force_style='${style}'`;
       args.push("-map", "0:v", "-map", "1:a", "-vf", vf, "-c:v", "libx264", "-profile:v", "high", "-preset", settings.preset, "-crf", String(settings.crf), "-pix_fmt", "yuv420p", "-g", String(settings.fps * 2));
     } else if (capMode === "mux") {
@@ -211,6 +219,16 @@ export function assemble(project, clips, settings, outPath, { captions = true, l
   }
 }
 
+// Low-res review copy at an export ratio: variant clips (cached in out/<ratio>/preview/), same audio and captions.
+export function ratioPreview(dir, aspect, { captions = true, log = () => {} } = {}) {
+  const project = loadProject(dir);
+  if (!ASPECTS[aspect]) throw new Error(`--ratio: unknown aspect ${aspect}; use ${Object.keys(ASPECTS).join(", ")}`);
+  if (aspect === project.studio.format.aspect) throw new Error(`--ratio ${aspect} is the main ratio: run concat-and-mix.mjs --preview without --ratio`);
+  const { clips, settings } = renderRatioClips(project, aspect, { mode: "preview", log });
+  const out = outputPath(project, "preview").replace(/\.mp4$/, `-${ratioTag(aspect)}.mp4`);
+  return { ...assemble(project, clips, settings, out, { captions, log }), scenes: clips.length };
+}
+
 export function concatAndMix(dir, { mode = "final", captions = true, log = () => {} } = {}) {
   const project = loadProject(dir);
   const plan = planRender(project, { mode });
@@ -231,13 +249,16 @@ export function concatAndMix(dir, { mode = "final", captions = true, log = () =>
 
 if (isMain(import.meta.url)) {
   try {
-    const args = parseArgs(process.argv.slice(2), { flags: ["preview", "no-captions", "help"] });
+    const args = parseArgs(process.argv.slice(2), { flags: ["preview", "no-captions", "help"], options: ["ratio"] });
     const dir = args._[0];
     if (args.help || !dir) {
-      console.log("usage: concat-and-mix.mjs <project-dir> [--preview] [--no-captions]");
+      console.log("usage: concat-and-mix.mjs <project-dir> [--preview [--ratio 9:16]] [--no-captions]");
       process.exit(dir ? 0 : 1);
     }
-    const r = concatAndMix(dir, { mode: args.preview ? "preview" : "final", captions: !args["no-captions"], log: console.log });
+    if (args.ratio && !args.preview) throw new Error("--ratio needs --preview (full-size export ratios come from publish.mjs)");
+    const r = args.ratio
+      ? ratioPreview(dir, args.ratio, { captions: !args["no-captions"], log: console.log })
+      : concatAndMix(dir, { mode: args.preview ? "preview" : "final", captions: !args["no-captions"], log: console.log });
     console.log(`✓ ${r.out}`);
     console.log(`  ${r.scenes} scenes, ${r.duration.toFixed(2)}s, ${r.video.width}x${r.video.height}@${r.video.fps}, captions: ${r.captions}${r.sfx ? `, ${r.sfx} sfx` : ""}${r.lufs != null ? `, loudness ${r.lufs} LUFS` : ""}`);
   } catch (err) {

@@ -9,16 +9,15 @@ import { readFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isMain, loadProject, parseArgs } from "./lib/project.mjs";
+import { DEFAULT_WPS, formatRate, speechRate, wordCount } from "./lib/speech-rate.mjs";
 
 const DATA = join(dirname(fileURLToPath(import.meta.url)), "data");
-const WORDS_PER_SECOND = { vi: 2.8, en: 2.5 };
 const MAX_SENTENCE_WORDS = 20;
 const TIMING_LIMIT = 0.9;
 const AV_KEYS = ["camera", "silence", "source", "sfx"];
 const CONNECTOR = /(?<![\p{L}\p{N}])(và rồi|rồi thì|and then)(?![\p{L}\p{N}])/giu;
 const NOT_FOR_EAR = /[\d%$€£₫&@#+=*\/\\<>°]/;
 
-const wordCount = (s) => s.split(/\s+/).filter(Boolean).length;
 
 // Replace HTML comments by blank lines so line numbers stay right and template hints are ignored.
 const stripComments = (text) => text.replace(/<!--[\s\S]*?-->/g, (m) => m.replace(/[^\n]/g, ""));
@@ -57,11 +56,13 @@ export function loadSlop(language) {
 }
 
 /**
- * Pure lint core. opts: { language, targetDuration, playbook, hasStory, research (research.md text) }.
+ * Pure lint core. opts: { language, targetDuration, playbook, hasStory, research (research.md text),
+ *   rate ({ wps, source, voice } from lib/speech-rate.mjs; default: the language's planning rate) }.
  * Returns [{ line, rule, severity: "error"|"warning", message }] sorted by line.
  */
 export function lintText(text, opts = {}) {
   const { language = "vi", targetDuration = null, playbook = null, hasStory = false, research = null } = opts;
+  const rate = opts.rate ?? { wps: DEFAULT_WPS[language] ?? DEFAULT_WPS.en, source: "default", voice: null };
   const scenes = parseScript(text);
   const out = [];
   const add = (line, rule, severity, message) => out.push({ line, rule, severity, message });
@@ -118,11 +119,10 @@ export function lintText(text, opts = {}) {
   }
 
   if (targetDuration > 0) {
-    const rate = WORDS_PER_SECOND[language] ?? WORDS_PER_SECOND.en;
     const words = bullets.reduce((n, b) => n + wordCount(b.text), 0);
-    const budget = rate * targetDuration;
+    const budget = rate.wps * targetDuration;
     if (words > TIMING_LIMIT * budget) {
-      add(1, "too-long", "warning", `${words} words vs ${Math.round(budget)} that fit ${targetDuration}s at ${rate} words/s (limit ${Math.round(TIMING_LIMIT * 100)}%). Cut the weakest beat.`);
+      add(1, "too-long", "warning", `${words} words vs ${Math.round(budget)} that fit ${targetDuration}s at ${formatRate(rate)} (limit ${Math.round(TIMING_LIMIT * 100)}%). Cut the weakest beat.`);
     }
   }
 
@@ -140,6 +140,7 @@ export function lintProject(project) {
     playbook: studio.story?.playbook,
     hasStory: Boolean(studio.story),
     research: existsSync(researchPath) ? readFileSync(researchPath, "utf8") : null,
+    rate: speechRate(project),
   });
 }
 

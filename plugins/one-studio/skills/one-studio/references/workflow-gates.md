@@ -9,15 +9,16 @@ Marks printed by status: `✓` done · `→` current · `!` input changed after 
 ## 0 · Setup
 
 - **In:** the user's request.
-- **Ask (one message, only missing items):** new video or series episode · 2D/3D/mixed · aspect + length (+ other ratios to publish) · VO language · look (brand colours/fonts/logo, a preset, or defaults) · **captions** · allowed services. Vietnamese example:
+- **Ask (one message, only missing items):** new video or series episode · where it will be posted (infer it when the user names YouTube Shorts, TikTok or Reels) · 2D/3D/mixed · aspect + length (+ other ratios to publish) · VO language · look (brand colours/fonts/logo, a preset, or defaults) · **captions** · allowed services. Vietnamese example:
   > Mình cần vài thông tin trước khi bắt đầu:
   > 1. Video mới hay tập tiếp theo của series nào?
-  > 2. 2D, 3D hay kết hợp? Tỉ lệ khung (16:9, 9:16, 1:1) và độ dài? Có cần xuất thêm tỉ lệ khác không?
+  > 2. Đăng ở đâu (YouTube, YouTube Shorts, TikTok, Reels…)? 2D, 3D hay kết hợp? Tỉ lệ khung (16:9, 9:16, 1:1) và độ dài? Có cần xuất thêm tỉ lệ khác không?
   > 3. Giọng đọc tiếng Việt qua ZeroTTS ở `http://localhost:8000` đúng không?
-  > 4. Màu/phông/logo riêng, hay chọn một mẫu: `apple-light`, `apple-keynote`, `neon-terminal`, `synthwave`, `ocean-calm`, `warm-editorial`, `swiss-mono`, `infinity-board`, `default`, các mẫu đã lưu từ video trước (xem `init-project.mjs --help`), hoặc lấy style từ một video/link có sẵn? (mình có thể dựng bảng so sánh)
+  > 4. Màu/phông/logo riêng, hay chọn một mẫu: `apple-light`, `apple-keynote`, `neon-terminal`, `synthwave`, `ocean-calm`, `warm-editorial`, `swiss-mono`, `infinity-board`, `default`, các mẫu bạn đã lưu trong thư viện (xem `init-project.mjs --help` hoặc `library.mjs D --presets`), hoặc lấy style từ một video/link có sẵn? (mình có thể dựng bảng so sánh)
   > 5. Phụ đề: **không** · **chỉ file .srt** · **phụ đề mềm** (bật/tắt được, kèm .srt) · **in cứng vào hình**?
   > 6. Được dùng dịch vụ trả phí / từ xa nào không? (mặc định: không)
-- **Do:** `node "$S/scripts/init-project.mjs" D --title "…" --lang <code> --dimension <2d|3d|mixed> --aspect <ratio> --duration <s> [--exports 16:9,9:16] [--preset <name>] [--captions none|sidecar|mux|burn] [--tts-url <url>] [--probe-tts] [--series <name>] [--series-root <dir>]`.
+- **Do:** `node "$S/scripts/init-project.mjs" D --title "…" --lang <code> --dimension <2d|3d|mixed> --aspect <ratio> --duration <s> [--exports 16:9,9:16] [--platform shorts,tiktok,reels,youtube] [--preset <name>] [--captions none|sidecar|mux|burn] [--tts-url <url>] [--probe-tts] [--series <name>] [--series-root <dir>]`.
+  - Shorts, TikTok and Reels are 9:16 (Shorts and Reels up to 3 min, TikTok 10 min): say so and suggest `--exports 9:16` (or `--aspect 9:16` when vertical is the main cut). `--platform` adds the missing 9:16 export itself, keeps 9:16 burned captions out of the platform UI (bottom 20 %, right 12 %) and warns when the target length is over the limit.
   - With `--series`, brand lives at `<series-root>/<name>/brand/brand.json` (default series root `D/../series`). If it exists it is reused: **do not ask brand questions**; the captions answer then goes to `studio.json → captions`.
   - "Lấy style từ video/link" → load `../style-extract/SKILL.md` and follow its steps (fetch needs `services.download`, asked once); its compare step shows 3 sample scenes in the style (works with no scenes yet); its apply step writes `brand.json` and `studio.json → story.style`, and only after the user's explicit OK on that sheet (ask again when approved scenes would need re-approval).
   - Presets saved from a style (`style-apply --as-preset`) live in the plugin cache and appear in `compare-presets.mjs`, `init-project --preset` and the list above like the built-in ones.
@@ -40,7 +41,7 @@ Marks printed by status: `✓` done · `→` current · `!` input changed after 
 - **Do:** follow the writers-room process (research → angle → beat outline → visual abstract), then write `D/script.md` as two columns:
   - `## s01 · Title` per scene, ids `s01, s02…` in order; `> visual:`, `> camera:`, `> sfx:`, `> silence: 1.5s`, `> source: <id>` lines optional.
   - Each `- ` bullet = one spoken sentence (≤ 20 words) = one TTS call = one caption cue.
-  - Hook in the first 3 s; one idea per scene; the total speaking time fits the target length (vi ≈ 2.8 words/s, en ≈ 2.5 words/s).
+  - Hook in the first 3 s; one idea per scene; the total speaking time fits the target length at the voice's speaking rate: `status.mjs D --estimate` prints it (measured from voice samples or the first `build-audio`, stored in `studio.json → audio.tts.<lang>.words_per_second`; before that the planning default vi 2.8, en 2.5 words/s). ZeroTTS voices often read about 4.5 words/s.
   - Run `script-lint.mjs D`, fix what it prints, do a read-aloud pass, cut about 20%.
 - **Ask:** show the script, total word count and estimated seconds: "Bạn duyệt kịch bản này chứ? Muốn sửa câu nào?"
 - **Close:** after the user's OK → `--approve script`.
@@ -51,7 +52,7 @@ Marks printed by status: `✓` done · `→` current · `!` input changed after 
   - one scene per script heading, same id; `lines[]` = the bullets (`id` = `<scene>-<n>`; `say` when numbers must be spelled out for TTS while `text` keeps digits);
   - visual modes come from `story.modes` (writers-room `visual-modes/`, at most 3 loaded);
   - `type` per scene: `text | diagram | data | lottie | rive | explainer | character | screen | 3d`. Prefer cheap types; use `explainer`, `character`, `screen`, `3d` only when the idea needs them;
-  - `duration` ≥ spoken time + 0.5 s; `transition` from brand defaults unless the story needs another;
+  - `duration` ≈ 0.3 s lead-in + words ÷ speaking rate + 0.25 s per pause + 1–1.5 s + the scene's scripted `> silence:`; never plan at the default rate when a measured one exists. `--estimate` warns about scenes planned more than 2.5 s longer than their speech; `transition` from brand defaults unless the story needs another;
   - world scenes: declare root `worlds` (`file`, `size`) and per scene `world`, `camera {from,to,move}`, `exit_state`; consecutive scenes of one world must chain (`camera.to` = next `camera.from`), the validator checks it and `new-scene` makes their transitions `cut`;
   - `character.style` = a lemo-opuscar style slug; `explainer.size` = `figure` unless the user asked for more.
 - **Ask:** show a table `id · type · duration · visual · lines`, the total length, and which scene types are expensive.
@@ -65,7 +66,7 @@ Marks printed by status: `✓` done · `→` current · `!` input changed after 
 
 ## 5 · Keyframe review — approval per scene
 
-- **Do:** `prepare-project.mjs D` (runtime, fonts, brand CSS, vendored libs, preview SFX cues) → `new-scene.mjs D --all` (templates per type; lemo scenes get a folder; Remotion scenes: `new-remotion.mjs D`) → write each scene (read its type reference first) → `keyframe-stills.mjs D` (only changed/unapproved scenes) → look at `review/sheet.jpg` yourself, fix, re-run for those ids.
+- **Do:** `prepare-project.mjs D` (runtime, fonts, brand CSS, vendored libs, preview SFX cues) → `new-scene.mjs D --all` (templates per type; lemo scenes get a folder; Remotion scenes: `new-remotion.mjs D`) → write each scene (read its type reference first; when the look has a mockup kit in the library, `new-scene.mjs D <id> --kit <kit> [--component <name>]`, see `references/user-library.md`) → `keyframe-stills.mjs D` (only changed/unapproved scenes) → look at `review/sheet.jpg` yourself, fix, re-run for those ids.
   - Other ratios in `format.exports` are captured too (one middle frame per scene → `review/sheet-<ratio>.jpg`). Fix portrait/square layout now with `<style data-ratio="9:16">` blocks: they are hashed for that ratio only, so the main-ratio approval and clips stay valid. These sheets are for review; approval follows the main ratio.
   - Same-world and `handoff` pairs also get `review/seams.jpg` (last frame of A beside first of B, with the pixel difference). Same-world seams above 2% are warnings here: fix the camera/state so the scenes meet, then re-run `seam-check.mjs D [--pairs s01:s02] [--threshold 0.02]` (exit 1 on a bad seam). Handoff differences are for the eye.
   - Without FFmpeg drawtext the sheets have no labels: rows/tiles are in storyboard order; say so when you show them.
@@ -84,12 +85,14 @@ Marks printed by status: `✓` done · `→` current · `!` input changed after 
 - **Captions** (re-ask only if the user wants to change the gate 0 answer): "Giữ phụ đề <mode> chứ?" → `status.mjs D --captions <mode>`.
 - **SFX** (optional): add `scenes[].sfx[]` cues to the storyboard (`references/audio-tts.md`); the picker page lists the built-in kit.
 - `build-audio.mjs D --dry-run` → number of TTS calls. If `services.tts` is not true, ask once; then `build-audio.mjs D --allow-tts`.
-- It fits scene lengths to the VO and writes `data-line` reveal timings into scenes that use them (approvals kept, gates 5–6 stay ✓), writes `audio/vo.wav`, `captions.srt` (unless captions are `none`), `audio/manifest.json`. Scenes it changed re-render at gate 8 (`render-changed-scenes --preview`).
+- It fits scene lengths to the VO and writes `data-line` reveal timings into scenes that use them (approvals kept, gates 5–6 stay ✓), writes `audio/vo.wav`, `captions.srt` (unless captions are `none`), `audio/manifest.json`, and the voice's measured speaking rate. Scenes it changed re-render at gate 8 (`render-changed-scenes --preview`).
+- It only ever lengthens a scene. When it prints `⚠ … longer than their voice-over`: `build-audio.mjs D --tighten` → show the table (storyboard, VO, silence, proposed = VO + 1.2 s + silence; `--pad` to change). Ask: "Rút ngắn các scene theo bảng này chứ? Storyboard sẽ cần duyệt lại." On OK → `--tighten --apply` (writes `storyboard.json`, refits scenes from the cached VO, no TTS call), then re-approve storyboard and estimate; keyframe approvals stay.
 - **Close:** `--approve audio` (refuses while music is undecided or the audio is stale).
 
 ## 8 · Preview — approval
 
 - `render-changed-scenes.mjs D --preview` then `concat-and-mix.mjs D --preview` → `out/<name>-preview.mp4` (540p, VO, music, captions, −14 LUFS).
+- Export ratios (always when `format.platforms` has shorts/tiktok/reels): `concat-and-mix.mjs D --preview --ratio 9:16` → `out/<name>-preview-9x16.mp4` (540×960, same audio and captions). Review only; fixes go into `<style data-ratio="9:16">` blocks.
 - **Ask:** send the path; collect scene-level fixes. Fixes → back to gate 5 for those scenes only.
 - **Close:** after OK → `--approve preview`.
 

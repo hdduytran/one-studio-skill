@@ -17,7 +17,7 @@ import { contactSheet } from "./keyframe-stills.mjs";
 export function comparePresets(dir, { presets = null, ids = null, at = 0.6, offline = false, log = () => {} } = {}) {
   const project = loadProject(dir);
   if (!project.brand) throw new Error("brand.json not found");
-  const all = loadPresets();
+  const all = loadPresets({ from: project.root });
   const names = presets ?? Object.keys(all);
   for (const n of names) if (!all[n]) throw new Error(`unknown preset ${n}; use ${Object.keys(all).join(", ")}`);
   const hf = (project.storyboard?.scenes ?? []).filter((s) => sceneEngine(s, project.studio) === "hyperframes" && existsSync(sceneFile(project, s.id)));
@@ -27,7 +27,7 @@ export function comparePresets(dir, { presets = null, ids = null, at = 0.6, offl
   const rows = [];
   const warnings = [];
   for (const name of names) {
-    const brand = { ...applyPreset(project.brand, name), name: `${project.brand.name} · ${name}` };
+    const brand = { ...applyPreset(project.brand, name, { from: project.root }), name: `${project.brand.name} · ${name}` };
     const { root, warning } = stageBrand(project, {
       root: join(project.root, ".one-studio", "presets", name),
       brand,
@@ -50,7 +50,7 @@ export function comparePresets(dir, { presets = null, ids = null, at = 0.6, offl
 
 export function applyPresetToProject(dir, name) {
   const project = loadProject(dir);
-  const next = applyPreset(project.brand, name);
+  const next = applyPreset(project.brand, name, { from: project.root });
   next.version = (project.brand.version ?? 1) + 1;
   writeJson(project.brandPath, next);
   return { brandPath: project.brandPath, version: next.version, series: project.studio.meta.series };

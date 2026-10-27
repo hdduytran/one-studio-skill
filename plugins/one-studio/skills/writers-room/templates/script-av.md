@@ -7,7 +7,7 @@ Two columns in one file. Voice = the "- " bullets, picture and sound = the "> " 
 - Optional per scene: "> visual:" the dominant concrete image · "> camera:" move inside the picture
   · "> sfx:" sound cue · "> silence: 1.5s" a pause with no voice · "> source: id1,id2" rows in research.md; one source line covers every bullet of its scene.
 - A scene may have only "> " lines (picture tells it) or only an sfx.
-Rough timing: Vietnamese ≈ 2.8 words/s, English ≈ 2.5 words/s. Run script-lint.mjs, then delete these comments.
+Timing: the voice's speaking rate from `status.mjs --estimate` (measured once there are voice samples or a first build; else Vietnamese ≈ 2.8, English ≈ 2.5 words/s). Run script-lint.mjs, then delete these comments.
 -->
 
 ## s01 · Hook
