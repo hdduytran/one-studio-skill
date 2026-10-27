@@ -26,7 +26,7 @@ You are the producer. You move one project through numbered gates, stop at every
 | 4 | Estimate | `status.mjs --estimate`, show the table | **user accepts** → `--approve estimate` |
 | 5 | Keyframes | `prepare-project` → `new-scene` → write scenes → `keyframe-stills` → show `review/sheet.jpg` (+ `sheet-<ratio>.jpg` per export); same-world pairs: `seam-check.mjs`, show `review/seams.jpg` | **user OK per scene** → `--approve-scenes <ids>` → `--approve keyframes` |
 | 6 | Build | `render-changed-scenes --preview` (only approved, changed scenes) | `--approve build` |
-| 7 | Audio | music pick (`make-music --samples` → `audio-picker` → `--use`), SFX cues, `build-audio` (asks before TTS), fits lengths + `data-line` reveals, captions | `--approve audio` |
+| 7 | Audio | music pick (`make-music --samples` → `audio-picker` → `--use`), SFX cues, acronyms → `pronunciations`, `build-audio` (asks before TTS), fits lengths + `data-line` reveals, captions; `check-pronunciation` (asks before STT) to screen misreadings | `--approve audio` |
 | 8 | Preview | `render-changed-scenes --preview` + `concat-and-mix --preview` (+ `--ratio 9:16` per export ratio) | **user OK** → `--approve preview` |
 | 9 | Render | `--estimate`, `render-changed-scenes`, `concat-and-mix` | `--approve render` |
 | 10 | Publish | `publish [--thumb-frame s02@3.5]` (extra ratios, thumbnails, manifest) | `--approve publish` |
@@ -39,6 +39,8 @@ Gate 0 asks, in ONE message, only what is missing (defaults in brackets):
 - captions? none · .srt only · soft track · burned in [burn; mux when FFmpeg has no libass]
 
 Then `node "$S/scripts/init-project.mjs" <dir> --title "…" --lang vi --dimension 2d --aspect 16:9 --duration 45 [--exports 16:9,9:16] [--platform shorts] [--preset …] [--captions …] [--tts-url … --probe-tts] [--series <name>]`, write remaining answers into `brand.json` and `studio.json → audio.tts`. Exact wording: `references/workflow-gates.md`.
+
+Draft preview at any time, outside the gates (nothing approved or recorded): `concat-and-mix.mjs D --draft [--labels]` → `out/<name>-draft[-labels].mp4`, every scene in draft quality with scene/line/time labels and one chapter per scene, for feedback on exact moments. Never a substitute for gate 8.
 
 Approval rules:
 - An approval is the user's explicit OK in chat. Never run `--approve` / `--approve-scenes` for gates 2, 3, 4, 5, 8 without it; show what is approved (script, scene table, estimate, contact sheet, preview path) in the same message as the question.
@@ -63,14 +65,14 @@ A scene's `mode` (storyboard) means `../writers-room/visual-modes/<mode>.md`: re
 
 User library (presets, mockup kits, own playbooks shared by all projects; `library.mjs D` shows where it is): `references/user-library.md`. Saving a look: `library.mjs D --save-preset <name>`; a scene from a kit: `new-scene.mjs D <id> --kit <kit> [--component <name>]`.
 
-Engines and traps: `references/engine-selection.md`. Rendering, cache, brand changes: `references/render-ffmpeg.md`. Audio (voices, music beds, SFX cues, captions, howler.js vs FFmpeg): `references/audio-tts.md`. Series & publishing: `references/series-publish.md`.
+Engines and traps: `references/engine-selection.md`. Rendering, cache, brand changes: `references/render-ffmpeg.md`. Audio (voices, pronunciations, speech-to-text check, music beds, SFX cues, captions, howler.js vs FFmpeg): `references/audio-tts.md`. Series & publishing: `references/series-publish.md`.
 
 ## Credit discipline
 
 - Show `status.mjs --estimate` before gates 5, 6 and 9 (tokens only for scenes to write/fix; render time only for scenes without a clip). Stop and ask on ⚠.
 - One scene = one file = one clip. Editing a scene re-reads only that scene's reference and re-renders only that scene.
-- Look at contact sheets yourself before showing them; fix obvious faults first.
-- Never call TTS, download or install anything without consent (`studio.json → services`). Music beds and SFX are synthesised locally (no consent needed); voice samples are TTS calls (ask). Keep chat output to tables and paths.
+- Look at contact sheets yourself before showing them; fix obvious faults first. Sheets hold ≤ 12 scenes (`sheet-1.jpg`, `sheet-2.jpg` …); for a moment between frames: `keyframe-stills.mjs D <id> --at 12.4,13.6`.
+- Never call TTS or speech-to-text, download or install anything without consent (`studio.json → services`). Music beds and SFX are synthesised locally (no consent needed); voice samples are TTS calls (ask). Keep chat output to tables and paths.
 - Screen capture (`capture-screen.mjs`) only after the user gives the URL and consent (`services.capture`); never type passwords, use only a storage state the user supplies. News research via web search only when the user asks and `services.web: true`.
 
 ## Consistency
@@ -83,6 +85,6 @@ Engines and traps: `references/engine-selection.md`. Rendering, cache, brand cha
 
 ## Files in a project
 
-`brief.md` · `research.md` (news/fact videos) · `script.md` · `storyboard.json` · `studio.json` (state) · `brand/` or `../series/<name>/brand/` · `assets/` (`music/`, `sfx/`, `audio-cues.js`) · `scenes/<id>.html` (or `scenes/<id>/` for lemo, `remotion/` for R3F) · `audio/` · `flows/<id>.json` + `capture/<id>/` (screen scenes) · `captions.srt` · `review/sheet*.jpg`, `review/audio-picker.html`, `review/voices/`, `review/music/`, `review/presets.jpg` · `out/scenes/<id>-<hash>.mp4` · `out/<name>.mp4` · `out/manifest.json`
+`brief.md` · `research.md` (news/fact videos) · `script.md` · `storyboard.json` · `studio.json` (state) · `brand/` or `../series/<name>/brand/` · `assets/` (`music/`, `sfx/`, `audio-cues.js`) · `scenes/<id>.html` (or `scenes/<id>/` for lemo, `remotion/` for R3F) · `audio/` · `flows/<id>.json` + `capture/<id>/` (screen scenes) · `captions.srt` · `review/sheet*.jpg`, `review/pronunciation.json`, `review/audio-picker.html`, `review/voices/`, `review/music/`, `review/presets.jpg` · `out/scenes/<id>-<hash>.mp4` · `out/draft/` (draft preview clips) · `out/<name>.mp4` · `out/manifest.json`
 
 Check any time: `node "$S/scripts/validate.mjs" <dir>`, `node "$S/scripts/check-external.mjs" <dir>` (also reports missing libass / drawtext; both have fallbacks).

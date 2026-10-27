@@ -8,6 +8,7 @@ import { fileHash, sceneEngine, sha256 } from "./project.mjs";
 import { effectiveDuration } from "./scenes.mjs";
 import { captionSetting } from "./captions.mjs";
 import { SFX_VERSION, sfxCues } from "./sfx.mjs";
+import { spokenText } from "./pronounce.mjs";
 
 export const HASH_VERSION = 1;
 const short = (h) => h.slice(0, 12);
@@ -138,7 +139,8 @@ export function scenesHash(project, opts = {}) {
 // Everything that changes the audio track: sentences, voices, TTS endpoints, music, pacing.
 export function audioHash(project) {
   const lines = (project.storyboard?.scenes ?? []).flatMap((s) =>
-    (s.lines ?? []).map((l) => [s.id, l.id, l.say ?? l.text, l.lang ?? null, l.voice ?? null, l.pause_after ?? null]),
+    // Spoken text (say, or text through the pronunciation dictionary): a dictionary edit re-opens the audio gate.
+    (s.lines ?? []).map((l) => [s.id, l.id, spokenText(project, l).text, l.lang ?? null, l.voice ?? null, l.pause_after ?? null]),
   );
   const a = project.studio.audio ?? {};
   const music = a.music ? fileHash(resolve(project.root, a.music)) : null;
