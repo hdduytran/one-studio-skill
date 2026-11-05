@@ -30,7 +30,7 @@ test("init creates a valid project that resumes at the brief gate", () => {
   assert.equal(run("init-project.mjs", dir).code, 1, "refuses to re-init");
 });
 
-test("portrait + English + 3d sets format and OmniVoice; 3D stays in HyperFrames", () => {
+test("portrait + English + 3d sets format, Chatterbox for en, OmniVoice otherwise; 3D stays in HyperFrames", () => {
   const { dir } = freshProject(["--aspect", "9:16", "--lang", "en", "--dimension", "3d"]);
   const studio = readJson(join(dir, "studio.json"));
   assert.deepEqual([studio.format.width, studio.format.height], [1080, 1920]);
@@ -38,6 +38,8 @@ test("portrait + English + 3d sets format and OmniVoice; 3D stays in HyperFrames
   assert.equal(studio.engine.dimension, "3d");
   assert.equal(studio.audio.tts.vi, undefined);
   assert.equal(studio.audio.tts.default.model, "omnivoice");
+  assert.equal(studio.audio.tts.en.model, "chatterbox");
+  assert.equal(studio.audio.tts.en.base_url, "http://localhost:8002");
 });
 
 test("series: second episode reuses the brand kit untouched", () => {
