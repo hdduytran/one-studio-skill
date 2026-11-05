@@ -34,11 +34,13 @@ You are the producer. You move one project through numbered gates, stop at every
 Gate 0 asks, in ONE message, only what is missing (defaults in brackets):
 - new video or episode of a series? (existing series → brand, voice, format, intro/outro reused: ask nothing about them)
 - where will it be posted? (infer from "Shorts", "TikTok", "Reels": those are 9:16 → suggest `--exports 9:16`, pass `--platform`) · 2D, 3D or mixed? [2D] · aspect ratio(s) and length? [16:9, 30–60 s]
-- voice-over language? [the user's] — `vi` → ZeroTTS, others → OmniVoice (local, OpenAI-compatible); confirm base URL once; the voice is picked by ear (samples + `audio-picker`), never left at `default`
+- voice-over language? [the user's] — `vi` → ZeroTTS, `en` → Chatterbox (bundled: `servers/chatterbox/chatterbox-server.sh`), others → OmniVoice (all local, OpenAI-compatible); confirm base URL once; the voice is picked by ear (samples + `audio-picker`), never left at `default`
 - brand colours/fonts/logo, a preset (`apple-light`, `apple-keynote`, `neon-terminal`, `synthwave`, `ocean-calm`, `warm-editorial`, `swiss-mono`, `infinity-board`, plus the user's own from the library: `init-project.mjs --help` lists every name), **or the style of an existing video/link** ("lấy style từ video/link" → load `../style-extract/SKILL.md`, it fills `brand.json` and `studio.json → story.style`), or defaults? · allowed paid/remote services? [none]
 - captions? none · .srt only · soft track · burned in [burn; mux when FFmpeg has no libass]
 
 Then `node "$S/scripts/init-project.mjs" <dir> --title "…" --lang vi --dimension 2d --aspect 16:9 --duration 45 [--exports 16:9,9:16] [--platform shorts] [--preset …] [--captions …] [--tts-url … --probe-tts] [--series <name>]`, write remaining answers into `brand.json` and `studio.json → audio.tts`. Exact wording: `references/workflow-gates.md`.
+
+English voice-over on this machine (Chatterbox, `http://localhost:8002`): before any voice step run `curl -sf localhost:8002/v1/audio/voices`. No answer → start it in the background with `bash "$S/servers/chatterbox/chatterbox-server.sh"` (first run installs into `~/.one-studio/chatterbox` and downloads ~3 GB: tell the user) and wait for `Uvicorn running` in its output. Its `default` voice is real and usable; cloned voices are `~/.one-studio/chatterbox/voices/<name>.wav`. It needs ~2 s of compute per 1 s of speech on a Mac CPU, so run `build-audio` in the background for long scripts. Stop it when the session's audio work is done (`pkill -f chatterbox/server.py`). Details: `references/audio-tts.md` → Chatterbox.
 
 Draft preview at any time, outside the gates (nothing approved or recorded): `concat-and-mix.mjs D --draft [--labels]` → `out/<name>-draft[-labels].mp4`, every scene in draft quality with scene/line/time labels and one chapter per scene, for feedback on exact moments. Never a substitute for gate 8.
 
