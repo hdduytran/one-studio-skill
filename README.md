@@ -1,174 +1,206 @@
 # one-studio
 
-Claude Code plugin làm video motion trọn gói: brief → kịch bản → storyboard → ước tính credit → duyệt keyframe → dựng từng scene → giọng đọc, nhạc nền, hiệu ứng âm thanh + phụ đề → render → xuất bản nhiều tỉ lệ. Mọi thứ chạy offline (TTS trên server của bạn, nhạc và SFX tổng hợp ngay trên máy). Sửa hoặc thêm scene thì chỉ render lại scene đó. Series dùng chung brand kit, giọng đọc và intro/outro.
+A Claude Code plugin that makes motion videos end to end: brief → script → storyboard → credit estimate → keyframe review → per-scene build → voice-over, music bed, sound effects + captions → render → publish in several aspect ratios. Everything runs offline (TTS on your own server, music and SFX synthesised on your machine). Editing or adding a scene re-renders only that scene. A series shares one brand kit, voice and intro/outro.
 
-## Cài đặt
+## Community showcase
+
+Channels and videos made with one-studio. Made one? Open a pull request that adds it here.
+
+### [Ping Dev](https://www.youtube.com/@pingdevvn) — tech explainers (Vietnamese & English)
+
+| Video | Length |
+|---|---|
+| [![A $12 server handled 310,000 users. How?](https://img.youtube.com/vi/gMq24d6SKpc/mqdefault.jpg)](https://www.youtube.com/watch?v=gMq24d6SKpc)<br>[A $12 server handled 310,000 users. How?](https://www.youtube.com/watch?v=gMq24d6SKpc) | 4:23 |
+| [![AI sửa AI](https://img.youtube.com/vi/nTnpOZF9jeU/mqdefault.jpg)](https://www.youtube.com/watch?v=nTnpOZF9jeU)<br>[AI sửa AI: đổi 0,016% trọng số, điểm toán tăng gấp 6](https://www.youtube.com/watch?v=nTnpOZF9jeU) | 7:47 |
+| [![Binance EIP-7702](https://img.youtube.com/vi/L5dm6WCW_xg/mqdefault.jpg)](https://www.youtube.com/watch?v=L5dm6WCW_xg)<br>[Binance mất 6,3 tỷ USD mà không lộ khoá: EIP-7702 và chiếc máy ký](https://www.youtube.com/watch?v=L5dm6WCW_xg) | 6:05 |
+| [![AI video](https://img.youtube.com/vi/5HIA62E2Us8/mqdefault.jpg)](https://www.youtube.com/watch?v=5HIA62E2Us8)<br>[AI làm ra một video như thế nào? Từ Will Smith ăn mì đến Genie 4](https://www.youtube.com/watch?v=5HIA62E2Us8) | 11:21 |
+| [![Worst days of the Internet](https://img.youtube.com/vi/csO1uTlaccE/mqdefault.jpg)](https://www.youtube.com/watch?v=csO1uTlaccE)<br>[Những ngày tồi tệ nhất của Internet: từ Morris Worm 1988 đến PHP2Shell](https://www.youtube.com/watch?v=csO1uTlaccE) | 12:33 |
+
+### [Vẽ lại Việt Nam](https://www.youtube.com/@velaivietnam) — how Vietnam's economy works, drawn on a whiteboard
+
+| Video |
+|---|
+| [![VPBank](https://img.youtube.com/vi/TcqSddwNw9M/mqdefault.jpg)](https://www.youtube.com/watch?v=TcqSddwNw9M)<br>[VPBank: Từ 20 tỷ đến 100.000 tỷ · Bản đồ toàn cảnh #1](https://www.youtube.com/watch?v=TcqSddwNw9M) |
+| [![Sovico](https://img.youtube.com/vi/pgF1q-Rl-CE/mqdefault.jpg)](https://www.youtube.com/watch?v=pgF1q-Rl-CE)<br>[Sovico: Ai thật sự giữ Vietjet và HDBank? · Bản đồ toàn cảnh #2](https://www.youtube.com/watch?v=pgF1q-Rl-CE) |
+| [![Masan](https://img.youtube.com/vi/g4AHDzvVbmg/mqdefault.jpg)](https://www.youtube.com/watch?v=g4AHDzvVbmg)<br>[Masan: Cái mỏ thắng cả WinMart · Bản đồ toàn cảnh #3](https://www.youtube.com/watch?v=g4AHDzvVbmg) |
+| [![3 triệu đồng](https://img.youtube.com/vi/IeDLoinvUXQ/mqdefault.jpg)](https://www.youtube.com/watch?v=IeDLoinvUXQ)<br>[3 triệu đồng và 10.000 trái tim: chuyện gì xảy ra sau cú bấm gửi?](https://www.youtube.com/watch?v=IeDLoinvUXQ) |
+
+## Install
 
 ```
 /plugin install one-studio --marketplace hdduytran/one-studio-skill
 ```
 
-Hoặc từ bản clone: `claude plugin marketplace add ./` rồi `claude plugin install one-studio@one-studio`.
+Or from a clone: `claude plugin marketplace add ./`, then `claude plugin install one-studio@one-studio`.
 
-### Yêu cầu
+### Requirements
 
-| Thành phần | Bắt buộc | Ghi chú |
+| Component | Required | Notes |
 |---|---|---|
-| Node.js ≥ 20 | ✓ | chạy mọi script (≥ 22 cho `capture-screen.mjs`) |
-| FFmpeg + FFprobe | ✓ | ghép, trộn âm, phụ đề, loudnorm. Thiếu libass (FFmpeg 8 của Homebrew) → phụ đề "in cứng" tự chuyển sang phụ đề mềm; thiếu drawtext → contact sheet không có nhãn |
-| Chrome Headless Shell | ✓ | `npx hyperframes@0.8.181 browser ensure`, hoặc đặt `HYPERFRAMES_BROWSER_PATH` |
-| yt-dlp | chỉ khi lấy style từ link | `brew install yt-dlp` hoặc `pipx install yt-dlp`; skill không tự cài. File video có sẵn thì không cần |
-| Python 3 | khi dùng file `.lottie` | đọc zip |
-| Server TTS OpenAI-compatible | khi có giọng đọc | ZeroTTS (tiếng Việt, danh sách giọng ở `/v1/audio/voices`), Chatterbox (tiếng Anh, có sẵn trong skill, xem bên dưới), OmniVoice (ngôn ngữ khác) |
-| anatomy skill | scene `explainer` | `npx skills add wheresryan22/anatomy -g -a claude-code` |
-| lemo-opuscar | scene `character` | clone + `npm install`, đặt `ONE_STUDIO_LEMO_LIB` |
-| Remotion | scene 3D có physics/post-fx | `new-remotion.mjs` rồi `npm install` trong `<project>/remotion` |
+| Node.js ≥ 20 | ✓ | runs every script (≥ 22 for `capture-screen.mjs`) |
+| FFmpeg + FFprobe | ✓ | concat, mixing, captions, loudnorm. Without libass (Homebrew FFmpeg 8) burned-in captions fall back to soft captions; without drawtext contact sheets have no labels |
+| Chrome Headless Shell | ✓ | `npx hyperframes@0.8.181 browser ensure`, or set `HYPERFRAMES_BROWSER_PATH` |
+| yt-dlp | only to extract a style from a link | `brew install yt-dlp` or `pipx install yt-dlp`; the skill never installs it. Not needed for a local video file |
+| Python 3 | for `.lottie` files | reads the zip |
+| OpenAI-compatible TTS server | for voice-over | ZeroTTS (Vietnamese, voices at `/v1/audio/voices`), Chatterbox (English, bundled, see below), OmniVoice (other languages) |
+| OpenAI-compatible speech-to-text server | optional | screens the voice-over for misread words (see Voice-over) |
+| anatomy skill | `explainer` scenes | `npx skills add wheresryan22/anatomy -g -a claude-code` |
+| lemo-opuscar | `character` scenes | clone + `npm install`, set `ONE_STUDIO_LEMO_LIB` |
+| Remotion | 3D scenes with physics/post-fx | `new-remotion.mjs`, then `npm install` in `<project>/remotion` |
 
-`node plugins/one-studio/skills/one-studio/scripts/check-external.mjs <project>` cho biết project cần gì và lệnh cài.
+`node plugins/one-studio/skills/one-studio/scripts/check-external.mjs <project>` tells you what a project needs and how to install it.
 
-### Giọng tiếng Anh: Chatterbox chạy trên máy
+### English voice: Chatterbox on your machine
 
-Chatterbox (Resemble AI, MIT) là giọng tiếng Anh mặc định của dự án `--lang en`. Skill kèm sẵn một server chuẩn OpenAI ở cổng 8002:
+Chatterbox (Resemble AI, MIT) is the default English voice for `--lang en` projects. The skill bundles an OpenAI-compatible server on port 8002:
 
 ```bash
 bash plugins/one-studio/skills/one-studio/servers/chatterbox/chatterbox-server.sh
 ```
 
-- Lần đầu cần `uv` (`brew install uv`). Script tự cài Python 3.11 và torch vào `~/.one-studio/chatterbox/.venv`, rồi tải model khoảng 3 GB.
-- Trên Mac, server chạy bằng CPU, nhanh hơn MPS khoảng 9 lần: mất khoảng 2 giây máy chạy cho mỗi giây giọng đọc. Có GPU NVIDIA thì tự dùng CUDA.
-- Clone giọng: đặt 5–15 giây giọng nói sạch vào `~/.one-studio/chatterbox/voices/<tên>.wav`, rồi chọn giọng `<tên>`. Chỉ clone giọng của bạn hoặc giọng bạn được phép dùng.
-- Chỉnh giọng (khởi động lại server để áp dụng): `CHATTERBOX_EXAGGERATION` chỉnh cảm xúc (mặc định 0.5), `CHATTERBOX_CFG` chỉnh nhịp đọc (mặc định 0.5), `CHATTERBOX_DEVICE` chọn `cpu`, `cuda` hoặc `mps`.
-- Tắt server: `pkill -f chatterbox/server.py`.
+- First run needs `uv` (`brew install uv`). The script installs Python 3.11 and torch into `~/.one-studio/chatterbox/.venv`, then downloads a ~3 GB model.
+- On a Mac the server runs on CPU, about 9× faster than MPS: roughly 2 seconds of compute per second of speech. With an NVIDIA GPU it uses CUDA automatically.
+- Voice cloning: put 5–15 seconds of clean speech in `~/.one-studio/chatterbox/voices/<name>.wav`, then pick voice `<name>`. Only clone your own voice or one you have permission to use.
+- Tuning (restart the server to apply): `CHATTERBOX_EXAGGERATION` sets emotion (default 0.5), `CHATTERBOX_CFG` sets pacing (default 0.5), `CHATTERBOX_DEVICE` picks `cpu`, `cuda` or `mps`.
+- Stop the server: `pkill -f chatterbox/server.py`.
 
-### Biến môi trường
+### Environment variables
 
-| Biến | Dùng cho |
+| Variable | Used for |
 |---|---|
-| `ONE_STUDIO_TTS_KEY_VI`, `ONE_STUDIO_TTS_KEY_EN`, `ONE_STUDIO_TTS_KEY` | API key của ZeroTTS / Chatterbox / OmniVoice (không bao giờ ghi vào file) |
-| `HYPERFRAMES_BROWSER_PATH` | Chrome cho HyperFrames |
-| `ONE_STUDIO_LEMO_LIB`, `PLAYWRIGHT_CHROME` | thư viện lemo-opuscar và Chrome của nó |
-| `ONE_STUDIO_ANATOMY` | thư mục anatomy nếu không cài dạng skill |
-| `ONE_STUDIO_CHROME`, `ONE_STUDIO_REMOTION_GL` | Chrome và WebGL backend cho Remotion |
-| `ONE_STUDIO_CACHE` | cache npm của GSAP/howler/three/lottie/font; mặc định `~/.cache/one-studio`. Preset lưu ở `presets/` trong đó trước khi có thư viện vẫn được đọc |
-| `ONE_STUDIO_LIBRARY` | thư mục thư viện của bạn (preset, mockup kit, playbook riêng); không đặt thì tìm `library/` hoặc `one-studio.library.json` ở các thư mục cha của project |
-| `ONE_STUDIO_YTDLP` | đường dẫn tới `yt-dlp` nếu không nằm trong PATH |
+| `ONE_STUDIO_TTS_KEY_VI`, `ONE_STUDIO_TTS_KEY_EN`, `ONE_STUDIO_TTS_KEY` | API key for ZeroTTS / Chatterbox / OmniVoice (never written to a file) |
+| env named in `audio.stt.<lang>.key_env` (e.g. `ONE_STUDIO_STT_KEY`) | API key for the speech-to-text server |
+| `HYPERFRAMES_BROWSER_PATH` | Chrome for HyperFrames |
+| `ONE_STUDIO_LEMO_LIB`, `PLAYWRIGHT_CHROME` | lemo-opuscar library and its Chrome |
+| `ONE_STUDIO_ANATOMY` | anatomy folder when not installed as a skill |
+| `ONE_STUDIO_CHROME`, `ONE_STUDIO_REMOTION_GL` | Chrome and WebGL backend for Remotion |
+| `ONE_STUDIO_CACHE` | npm cache for GSAP/howler/three/lottie/fonts; default `~/.cache/one-studio`. Presets saved under its `presets/` before the library existed are still read |
+| `ONE_STUDIO_LIBRARY` | your library folder (presets, mockup kits, playbooks); if unset, a `library/` folder or `one-studio.library.json` in the project's parent folders is used |
+| `ONE_STUDIO_YTDLP` | path to `yt-dlp` when it is not on PATH |
 
-## Dùng
+## Usage
 
-Gõ `/one-studio` kèm yêu cầu, ví dụ `/one-studio làm video 40 giây giải thích GPS, 2D, 16:9, tiếng Việt`. Skill dẫn qua 11 gate và dừng chờ bạn duyệt ở kịch bản, storyboard, ước tính credit, keyframe từng scene và bản preview.
+Type `/one-studio` with a request, for example `/one-studio make a 40-second 2D explainer about GPS, 16:9, English`. The skill walks through 11 gates and stops for your approval at the script, storyboard, credit estimate, each scene's keyframes and the preview.
 
-| Gate | Script chính |
+| Gate | Main scripts |
 |---|---|
-| 0 Setup | `init-project.mjs <dir> [--series <tên>] [--lang vi] [--aspect 16:9] [--exports 16:9,9:16] [--platform shorts,tiktok,reels,youtube] [--dimension 2d] [--preset apple-light] [--captions none\|sidecar\|mux\|burn] [--tts-url …] [--probe-tts]` |
-| 1 Brief | điền `brief.md` kèm Story core (skill `writers-room`), `status.mjs <dir> --approve brief` |
-| 2 Kịch bản | `script-lint.mjs <dir>` (luật cấm, câu > 20 từ, số chưa viết cho tai, thiếu cột hình, fact thiếu nguồn) + đọc to, rồi `status.mjs --approve script` |
-| 3–4 Storyboard, ước tính | chọn mode/world/camera, `status.mjs <dir> [--estimate] [--approve <gate>]` |
-| 5 Keyframe | `prepare-project.mjs`, `new-scene.mjs`, `capture-screen.mjs` (scene `screen`), `keyframe-stills.mjs` (cả các tỉ lệ xuất, kèm `review/seams.jpg`), `seam-check.mjs`, `compare-presets.mjs`, `status.mjs --approve-scenes` |
+| 0 Setup | `init-project.mjs <dir> [--series <name>] [--lang en] [--aspect 16:9] [--exports 16:9,9:16] [--platform shorts,tiktok,reels,youtube] [--dimension 2d] [--preset apple-light] [--captions none\|sidecar\|mux\|burn] [--tts-url …] [--probe-tts]` |
+| 1 Brief | fill `brief.md` with a Story core (`writers-room` skill), `status.mjs <dir> --approve brief` |
+| 2 Script | `script-lint.mjs <dir>` (banned phrases, sentences > 20 words, numbers not written for the ear, missing visual column, facts without a source) + read aloud, then `status.mjs --approve script` |
+| 3–4 Storyboard, estimate | pick mode/world/camera, `status.mjs <dir> [--estimate] [--approve <gate>]` |
+| 5 Keyframes | `prepare-project.mjs`, `new-scene.mjs`, `capture-screen.mjs` (`screen` scenes), `keyframe-stills.mjs` (all export ratios, plus `review/seams.jpg`; `--at 12.4,13.6` for stills at chosen times), `seam-check.mjs`, `compare-presets.mjs`, `status.mjs --approve-scenes` |
 | 6 Build | `render-changed-scenes.mjs --preview` |
-| 7 Audio | `make-music.mjs --samples`, `audio-picker.mjs`, `make-music.mjs --use <nhạc\|none>`, `status.mjs --captions <mode>`, `build-audio.mjs [--allow-tts]`, `build-audio.mjs --tighten [--apply]` (rút ngắn scene theo giọng đọc thật, phải duyệt lại storyboard) |
-| 8 Preview | `concat-and-mix.mjs --preview`, `concat-and-mix.mjs --preview --ratio 9:16` (bản xem thử dọc cho Shorts/TikTok) |
+| 7 Audio | `make-music.mjs --samples`, `audio-picker.mjs`, `make-music.mjs --use <track\|none>`, `status.mjs --captions <mode>`, `build-audio.mjs [--allow-tts]`, `check-pronunciation.mjs [--allow-stt]`, `build-audio.mjs --tighten [--apply]` (shorten scenes to the real voice-over; storyboard needs re-approval) |
+| 8 Preview | `concat-and-mix.mjs --preview` (one chapter per scene), `concat-and-mix.mjs --preview --ratio 9:16` (vertical preview for Shorts/TikTok) |
 | 9 Render | `render-changed-scenes.mjs`, `concat-and-mix.mjs` |
 | 10 Publish | `publish.mjs [--ratios 9:16,1:1] [--thumb-frame s02@3.5]` |
 
-Công cụ khác: `library.mjs` (thư viện của bạn), `script-lint.mjs`, `seam-check.mjs`, `capture-screen.mjs`, `validate.mjs`, `brand-to-css.mjs`, `optimize-assets.mjs`, `anatomy-to-svg.mjs`, `new-remotion.mjs`, `series-bumper.mjs`, `make-sfx.mjs`, `sync-lines.mjs`, `tts-openai-compatible.mjs --probe | --voices | --samples all | --use-voice <id>`, `check-external.mjs`.
+Other tools: `library.mjs` (your library), `script-lint.mjs`, `seam-check.mjs`, `capture-screen.mjs`, `validate.mjs`, `brand-to-css.mjs`, `optimize-assets.mjs`, `anatomy-to-svg.mjs`, `new-remotion.mjs`, `series-bumper.mjs`, `make-sfx.mjs`, `sync-lines.mjs`, `tts-openai-compatible.mjs --probe | --voices | --samples all | --use-voice <id>`, `check-external.mjs`.
 
-## Lấy style từ video
+### Draft preview (any time, outside the gates)
 
-Đưa một file video hoặc link, one-studio đo nhịp cắt, màu, chuyển động, âm thanh, rồi Claude xem 2 contact sheet để đọc phông, bố cục, giọng điệu. Kết quả là một style card (`style-refs/<slug>/style.json` + `STYLE.md`), cùng bảng so sánh: khung gốc ở hàng trên, 3 scene mẫu (tiêu đề, biểu đồ, phụ đề) dựng theo style ở hàng giữa, bảng màu ở hàng dưới. Bạn xem, nhờ chỉnh nhiều vòng, đồng ý rồi mới áp vào `brand.json`. Gọi bằng `/one-studio lấy style từ <link hoặc file>` (gate 0).
+Want to watch the whole video before every gate is approved? `concat-and-mix.mjs <dir> --draft [--labels]` renders every scene in draft quality (approved or not, cached in `out/draft/`) and mixes it like a preview → `out/<name>-draft.mp4`. Nothing is approved or recorded in `studio.json`. `--labels` draws `scene · title │ current VO line │ +seconds in scene │ ▶ time in video` on each HyperFrames scene, so feedback can name exact moments. One MP4 chapter per scene. It never replaces the gate 8 preview.
 
-| Lệnh | Việc |
+## Extract a style from a video
+
+Give a video file or link: one-studio measures cut rhythm, colour, motion and audio, then Claude reads two contact sheets for fonts, layout and tone. The result is a style card (`style-refs/<slug>/style.json` + `STYLE.md`) and a comparison sheet: source frames on the top row, 3 sample scenes (title, chart, caption) built in the style on the middle row, palette on the bottom row. Review it, ask for as many rounds of changes as you like, and only once you agree is it applied to `brand.json`. Run it with `/one-studio extract the style from <link or file>` (gate 0).
+
+| Command | Does |
 |---|---|
-| `style-fetch.mjs <dir> <url\|file> [--from 0:00] [--to 1:30] [--max 90] [--keep]` | lấy video (mặc định 90 giây đầu) |
-| `style-analyze.mjs <dir> <slug>` | đo bằng FFmpeg, ra `metrics.json` + 2 contact sheet |
-| `style-draft.mjs <dir> <slug>` | ghép số đo và phần Claude đọc thành `style.json` |
-| `style-compare.mjs <dir> <slug> [--variant v] [--ratio 9:16]` | sheet so sánh, không render video |
-| `style-enhance.mjs <dir> <slug> [--accept 1,3] [--reject 2]` | đề xuất cải tiến kèm lý do và ảnh trước/sau; chỉ áp khi bạn nhận |
-| `style-set.mjs <dir> <slug> key=value … [--lock key]`, `style-diff.mjs`, `style-editor.mjs` | chỉnh qua chat hoặc trang `review/style-editor.html` (offline) |
-| `style-merge.mjs <dir> <a> <b> … --as <slug>` | gộp nhiều video thành một style |
-| `style-apply.mjs <dir> <slug> [--variant v] [--as-preset tên] [--keep] [--dry-run] [--allow-low-contrast]` | ghi vào `brand.json` (tăng `version`), `studio.json → story.style`, gợi ý storyboard/audio |
+| `style-fetch.mjs <dir> <url\|file> [--from 0:00] [--to 1:30] [--max 90] [--keep]` | fetch the video (first 90 seconds by default) |
+| `style-analyze.mjs <dir> <slug>` | measure with FFmpeg → `metrics.json` + 2 contact sheets |
+| `style-draft.mjs <dir> <slug>` | merge measurements and Claude's reading into `style.json` |
+| `style-compare.mjs <dir> <slug> [--variant v] [--ratio 9:16]` | comparison sheet, no video render |
+| `style-enhance.mjs <dir> <slug> [--accept 1,3] [--reject 2]` | suggested improvements with reasons and before/after images; applied only when you accept |
+| `style-set.mjs <dir> <slug> key=value … [--lock key]`, `style-diff.mjs`, `style-editor.mjs` | tweak by chat or in `review/style-editor.html` (offline) |
+| `style-merge.mjs <dir> <a> <b> … --as <slug>` | merge several videos into one style |
+| `style-apply.mjs <dir> <slug> [--variant v] [--as-preset name] [--keep] [--dry-run] [--allow-low-contrast]` | write to `brand.json` (bumps `version`), `studio.json → story.style`, storyboard/audio hints |
 
-- **Đồng ý của bạn:** link chỉ được tải khi `studio.json → services.download: true` (Claude hỏi một lần). Không tự cài yt-dlp, không dùng cookies trình duyệt. File có sẵn thì không cần gì.
-- **Nền tảng:** YouTube, TikTok, Facebook, Instagram qua yt-dlp. Video riêng tư, cần đăng nhập hoặc giới hạn tuổi (hay gặp ở Facebook và Instagram) thì dừng lại, bạn tự tải rồi đưa file. TikTok và Instagram đôi khi chặn tải; đưa file là cách chắc nhất. Phụ đề chỉ là phần thêm: tải phụ đề lỗi (hay gặp HTTP 429) thì video vẫn được tải, không kèm phụ đề.
-- **Không bao giờ lấy:** khung hình, logo, linh vật, nhân vật, slogan và chữ trên hình, nhạc, giọng, tên tác giả. Chỉ lấy cách trình bày (màu, phông gần nhất, nhịp, chuyển cảnh, kiểu phụ đề, loudness). Nhạc chỉ gợi ý bản nền gần nhất có sẵn. Video gốc nằm trong `style-refs/` (git bỏ qua) và bị xoá sau khi áp, trừ khi dùng `--keep`.
-- **Enhance và customize:** style gồm các lớp, lớp sau thắng: số đo < đề xuất đã nhận < chỉnh của bạn (có thể khoá) < biến thể sáng/tối. Trích lại hay gộp không ghi đè phần bạn đã chỉnh hoặc khoá. Style luôn đạt WCAG AA cho chữ chính; nếu không, `style-apply` từ chối (đổi màu hoặc nhận đề xuất `contrast`, hoặc `--allow-low-contrast` nếu bạn chắc).
-- **Preset:** `--as-preset tên` lưu look vào thư viện của bạn (`<thư viện>/presets/<tên>.json`, xem mục Thư viện bên dưới). Preset đó hiện trong `compare-presets.mjs` và `init-project.mjs --preset`; preset có sẵn của plugin không bao giờ bị ghi đè. Màu thẻ/khung (`colors.surface`, ví dụ thẻ kem trên nền tím nhạt) được giữ riêng, không bị làm tối như màu chữ.
-- `status.mjs` hiện style đang dùng và đánh dấu `!` khi style card đổi sau lần áp; `validate.mjs` kiểm `story.style` trỏ tới style có thật.
+- **Your consent:** links are downloaded only when `studio.json → services.download: true` (Claude asks once). yt-dlp is never auto-installed and browser cookies are never used. A local file needs nothing.
+- **Platforms:** YouTube, TikTok, Facebook, Instagram through yt-dlp. Private, login-only or age-restricted videos (common on Facebook and Instagram) stop the fetch; download the file yourself and pass it in. TikTok and Instagram sometimes block downloads; a file is the safest route. Subtitles are a bonus: if they fail (often HTTP 429), the video still downloads without them.
+- **Never taken:** frames, logos, mascots, characters, slogans and on-screen text, music, voices, creator names. Only presentation is taken (colours, nearest fonts, pacing, transitions, caption style, loudness). Music only suggests the closest bundled bed. Source videos live in `style-refs/` (git-ignored) and are deleted after applying unless you pass `--keep`.
+- **Enhance and customise:** a style is layered, later layers win: measurements < accepted suggestions < your edits (lockable) < light/dark variant. Re-extracting or merging never overwrites what you edited or locked. Main text always meets WCAG AA; otherwise `style-apply` refuses (change the colour, accept the `contrast` suggestion, or pass `--allow-low-contrast` if you are sure).
+- **Presets:** `--as-preset name` saves the look to your library (`<library>/presets/<name>.json`, see Your library). It then shows up in `compare-presets.mjs` and `init-project.mjs --preset`; built-in presets are never overwritten. Card/panel colour (`colors.surface`, e.g. cream cards on a pale purple background) is kept separately and not darkened like text colours.
+- `status.mjs` shows the active style and marks `!` when the style card changed after applying; `validate.mjs` checks that `story.style` points at a real style.
 
-## Thư viện của bạn
+## Your library
 
-Một thư mục dùng chung cho mọi project, giữ những gì bạn muốn dùng lại: look (preset), mockup kit (giao diện điện thoại, bong bóng chat, thẻ…) và cấu trúc kịch bản (playbook riêng). Tìm theo thứ tự: `ONE_STUDIO_LIBRARY`, rồi `one-studio.library.json` (`{ "path": "…" }`) hoặc thư mục tên đúng `library` (có `presets/`, `kits/` hoặc `playbooks/`) ở các thư mục cha của project, cuối cùng là cache cũ.
+One folder shared by every project, holding what you want to reuse: looks (presets), mockup kits (phone frames, chat bubbles, cards…) and script structures (your own playbooks). Lookup order: `ONE_STUDIO_LIBRARY`, then `one-studio.library.json` (`{ "path": "…" }`) or a folder named exactly `library` (with `presets/`, `kits/` or `playbooks/`) in the project's parent folders, finally the old cache.
 
 ```
-<thư viện>/presets/<tên>.json · kits/<kit>/kit.css + components/*.html + gallery.html · playbooks/<id>.md
+<library>/presets/<name>.json · kits/<kit>/kit.css + components/*.html + gallery.html · playbooks/<id>.md
 ```
 
-| Lệnh | Việc |
+| Command | Does |
 |---|---|
-| `library.mjs --init <thư mục>` | tạo thư viện |
-| `library.mjs <dir> [--presets \| --kits \| --playbooks]` | thư viện nằm đâu, có gì |
-| `library.mjs <dir> --save-preset <tên>` | lưu look hiện tại của project, không cần áp lại style |
-| `library.mjs <dir> --import-cache` | chép preset cũ trong cache vào thư viện |
-| `new-scene.mjs <dir> <id> --kit <kit> [--component <tên>]` | chép CSS của kit vào scene (scene tự đủ, đổi kit thì chạy lại để cập nhật); `--component` dựng scene từ một mẫu |
-| `library.mjs <dir> --kit-gallery <kit>` | trang xem mọi mẫu của kit với brand của project |
+| `library.mjs --init <folder>` | create a library |
+| `library.mjs <dir> [--presets \| --kits \| --playbooks]` | where the library is and what it holds |
+| `library.mjs <dir> --save-preset <name>` | save the project's current look without re-applying a style |
+| `library.mjs <dir> --import-cache` | copy old cached presets into the library |
+| `new-scene.mjs <dir> <id> --kit <kit> [--component <name>]` | copy the kit's CSS into the scene (scenes stay self-contained; re-run after a kit changes); `--component` builds the scene from a template |
+| `library.mjs <dir> --kit-gallery <kit>` | page showing every kit template in the project's brand |
 
-Playbook riêng hiện cạnh 14 playbook có sẵn (id trùng thì bản có sẵn thắng). Ví dụ đầy đủ: `examples/library/` (look Claude Duet, kit 9 mẫu, playbook `product-launch-short`). Chi tiết: `plugins/one-studio/skills/one-studio/references/user-library.md`.
+Your playbooks appear beside the 14 built-in ones (on an id clash the built-in wins). Full example: `examples/library/` (Claude Duet look, 9-template kit, `product-launch-short` playbook). Details: `plugins/one-studio/skills/one-studio/references/user-library.md`.
 
-## Viết kịch bản: writers-room
+## Script writing: writers-room
 
-Skill `writers-room` (gọi từ gate 1–3) viết kịch bản như người đã nghiên cứu chủ đề, không như khuôn mẫu:
+The `writers-room` skill (used at gates 1–3) writes scripts like someone who researched the topic, not like a template:
 
-- **14 playbook** theo thể loại (`mechanism-system`, `concept-explainer`, `news-recap`, `saas-product`, `customer-story`…), mỗi cái một khung xương có tỉ lệ thời lượng; chỉ nạp một playbook, chọn bằng `playbooks/index.md`.
-- **4 định dạng** chồng lên playbook (chọn tối đa một): `short-vertical`, `long-form`, `series-episode`, `no-voice`. **5 giọng** (`tones.md`): `knowing-friend`, `dry-expert`, `playful`, `neutral-newsroom`, `cinematic-minimal`.
-- **Story core** trong `brief.md`: angle một câu, con người thật, xung đột, hiểu lầm phổ biến, chi tiết chỉ chủ đề này có, góc nhìn/giọng, lời hứa và chỗ trả lời hứa, nguồn. Lựa chọn ghi ở `studio.json → story`.
-- **Kịch bản hai cột**: lời đọc (mỗi gạch đầu dòng một câu ≤ 20 từ) và hình (`> visual:`, `> camera:`, `> sfx:`, `> silence:`, `> source:`).
-- **`script-lint.mjs`** bắt cụm sáo rỗng vi/en, câu quá dài, số chưa viết cho tai, chuỗi "và rồi", thiếu cột hình, fact thiếu nguồn; sau đó đọc to và cắt khoảng 20%.
-- **Mode hình ảnh** (`visual-modes/`): `world-camera`, `match-cut-motif`, `exploded-cutaway`, `screen-cinema`, `kinetic-type`… mỗi scene khai `mode` trong storyboard.
+- **14 playbooks** by genre (`mechanism-system`, `concept-explainer`, `news-recap`, `saas-product`, `customer-story`…), each a skeleton with timing ratios; only one is loaded, chosen via `playbooks/index.md`.
+- **4 formats** layered on a playbook (pick at most one): `short-vertical`, `long-form`, `series-episode`, `no-voice`. **5 tones** (`tones.md`): `knowing-friend`, `dry-expert`, `playful`, `neutral-newsroom`, `cinematic-minimal`.
+- **Story core** in `brief.md`: one-sentence angle, a real person, the conflict, a common misconception, a detail only this topic has, point of view/voice, the promise and where it pays off, sources. Choices go in `studio.json → story`.
+- **Two-column script**: narration (one sentence ≤ 20 words per bullet) and picture (`> visual:`, `> camera:`, `> sfx:`, `> silence:`, `> source:`).
+- **`script-lint.mjs`** catches vi/en clichés, long sentences, numbers not written for the ear, "and then" chains, missing visual column, facts without a source; then read aloud and cut ~20%.
+- **Visual modes** (`visual-modes/`): `world-camera`, `match-cut-motif`, `exploded-cutaway`, `screen-cinema`, `kinetic-type`… each scene declares its `mode` in the storyboard.
 
-## Thế giới liên tục
+## Continuous worlds
 
-Nhiều scene dùng chung một "thế giới" (`worlds/<id>.html`, khai ở `storyboard.json → worlds`). Mỗi scene chỉ là một đoạn đường của camera:
+Several scenes can share one "world" (`worlds/<id>.html`, declared in `storyboard.json → worlds`). Each scene is just one stretch of the camera's path:
 
-- `S.camera(...)` bay giữa các `data-place` của thế giới (`camera.from` → `camera.to`, scene sau bắt đầu đúng chỗ scene trước kết thúc); `S.state(id, tên, { at })` đổi trạng thái đối tượng; `exit_state` / `enter_state` giữ trạng thái qua mối nối.
-- Validator kiểm camera nối liền; `new-scene.mjs` đặt chuyển cảnh `cut` giữa các scene cùng world.
-- **Seam check** (`seam-check.mjs`, tự chạy trong `keyframe-stills.mjs`): khung cuối scene A cạnh khung đầu scene B kèm độ lệch điểm ảnh (`review/seams.jpg`); cùng world mà lệch > 2% thì báo lỗi. Cặp `handoff` (match cut theo motif) chỉ để mắt người xem xét.
-- Sửa một scene chỉ render lại scene đó.
+- `S.camera(...)` flies between the world's `data-place` points (`camera.from` → `camera.to`; the next scene starts exactly where the previous one ended); `S.state(id, name, { at })` changes an object's state; `exit_state` / `enter_state` carry state across a seam.
+- The validator checks the camera path is continuous; `new-scene.mjs` uses a `cut` transition between scenes in the same world.
+- **Seam check** (`seam-check.mjs`, runs inside `keyframe-stills.mjs`): last frame of scene A next to first frame of scene B with a pixel difference (`review/seams.jpg`); same world and > 2% difference is an error. `handoff` pairs (motif match cuts) are for human eyes only.
+- Editing a scene re-renders only that scene.
 
-## Quay màn hình
+## Screen capture
 
-Scene `screen` dùng video thật quay từ một trang web theo kịch bản trong `flows/<id>.json` (schema `flow.schema.json`):
+`screen` scenes use real video recorded from a web page following a script in `flows/<id>.json` (schema `flow.schema.json`):
 
-- `capture-screen.mjs <dir> <flow-id>` mở Chrome, đi theo flow (click, gõ, cuộn, đánh dấu), ghi video cố định fps cùng `events.json` (đường đi con trỏ, vùng click). Scene zoom theo vùng click như Screen Studio. Con trỏ sinh từ seed nên log lặp lại được; chỉ quay lại khi flow đổi hoặc `--recapture`.
-- **Cần đồng ý của bạn**: `studio.json → services.capture: true` và chỉ URL bạn đưa. Chỉ điều hướng trong origin của flow, từ chối gõ vào ô mật khẩu; đăng nhập chỉ bằng storage state bạn cung cấp.
-- Yêu cầu: Node ≥ 22 (chạy `capture-screen.mjs`), Chrome, FFmpeg. Thời gian quay thật ~30 giây mỗi flow.
+- `capture-screen.mjs <dir> <flow-id>` opens Chrome, follows the flow (click, type, scroll, highlight) and records fixed-fps video plus `events.json` (cursor path, click areas). The scene zooms to click areas like Screen Studio. The cursor is seeded, so logs are reproducible; it re-records only when the flow changes or with `--recapture`.
+- **Needs your consent**: `studio.json → services.capture: true` and only URLs you give. It navigates only within the flow's origin and refuses to type into password fields; login only via a storage state you provide.
+- Requirements: Node ≥ 22 (for `capture-screen.mjs`), Chrome, FFmpeg. Real recording time is ~30 seconds per flow.
 
-## Tin tức
+## News
 
-- Video tin tức/sự thật: research **chỉ khi bạn yêu cầu** và `services.web: true`; chạy trong subagent, agent chính chỉ đọc `research.md`.
-- Mỗi dòng `research.md` có loại `fact | quote | opinion | context`, nguồn, URL, ngày đăng, ngày truy cập, người nói. Fact tin tức cần ≥ 2 nguồn độc lập; trích dẫn nguyên văn.
-- Câu có nguồn ghi `> source: r1,r2`; lint kiểm id tồn tại. Ý kiến được nói là ý kiến và hiện nhãn **Ý KIẾN** trên hình. `publish.mjs` đưa danh sách nguồn vào `out/manifest.json` và `out/sources.txt`.
+- News/fact videos: research runs **only when you ask** and `services.web: true`; it runs in a subagent and the main agent only reads `research.md`.
+- Each `research.md` row has a type `fact | quote | opinion | context`, source, URL, publish date, access date, speaker. News facts need ≥ 2 independent sources; quotes are verbatim.
+- Sourced lines carry `> source: r1,r2`; lint checks the ids exist. Opinions are voiced as opinions and get an **OPINION** label on screen. `publish.mjs` writes the source list to `out/manifest.json` and `out/sources.txt`.
 
-## Cách hoạt động
+## How it works
 
-- **Render tăng dần:** hash mỗi scene gồm file nguồn, mọi file nó tham chiếu, phiên bản brand, engine và định dạng. Clip `out/scenes/<id>-<hash>.mp4` đã có thì không render lại. Mọi clip được chuẩn hoá về một kiểu encode nên bước ghép chỉ copy stream.
-- **Duyệt trước khi render:** scene chỉ được render khi keyframe của đúng phiên bản đó đã được duyệt. Sửa scene thì chỉ scene đó phải duyệt lại.
-- **Audio:** mỗi câu là một lần gọi TTS và được cache. Giọng đọc chọn bằng tai: nghe mẫu từng giọng của server rồi chọn. Scene tự kéo dài cho khớp giọng đọc, và chữ gắn `data-line` hiện đúng lúc câu đó được đọc, mà vẫn giữ trạng thái đã duyệt. Phụ đề tính từ thời lượng audio thật, không cần Whisper; bạn chọn không phụ đề, chỉ `.srt`, phụ đề mềm hoặc in cứng.
-- **Nhạc & SFX:** nhạc nền tổng hợp offline (`ambient`, `lofi`… loop liền mạch, chỉnh BPM/giọng/độ dài) hoặc file của bạn; bộ SFX (whoosh, pop, ding, riser, impact…) đặt theo từng scene trong storyboard. Trang `review/audio-picker.html` (howler.js, chạy local) để nghe thử giọng, nhạc, SFX cạnh nhau. Bản trộn cuối luôn do FFmpeg làm: −14 LUFS, nhạc tự giảm khi có giọng đọc.
-- **Giao diện:** 9 preset (`apple-light`, `apple-keynote`, `neon-terminal`, `synthwave`, `ocean-calm`, `warm-editorial`, `swiss-mono`, `infinity-board`, `default`) cộng preset bạn lưu từ video, so sánh trên cùng các scene bằng một contact sheet; bề mặt kính mờ kiểu macOS (`brand.json → surface: "glass"`).
-- **Nhiều tỉ lệ:** keyframe 9:16 / 1:1 được chụp ngay ở gate 5. CSS riêng cho một tỉ lệ (`<style data-ratio="9:16">`) chỉ làm render lại tỉ lệ đó.
-- **Engine:** HyperFrames (HTML/GSAP) là mặc định, kể cả canvas, Lottie và three.js. Remotion chỉ dùng cho 3D có physics hoặc post-processing. anatomy được xuất SVG tĩnh rồi animate bằng GSAP. lemo-opuscar render ra clip riêng.
+- **Incremental render:** each scene's hash covers its source file, every file it references, brand version, engine and format. An existing `out/scenes/<id>-<hash>.mp4` is not rendered again. Every clip is normalised to one encoding, so concat only copies streams.
+- **Approve before render:** a scene renders only when the keyframes of that exact version were approved. Editing a scene requires re-approving only that scene.
+- **Voice-over:** one TTS call per sentence, cached. Voices are chosen by ear: listen to samples of each server voice, then pick. Scenes stretch to fit the voice-over, and text tagged `data-line` appears exactly when its sentence is spoken, without losing approvals. Captions come from real audio durations, no Whisper needed; choose no captions, `.srt` only, soft or burned-in captions.
+- **Pronunciations:** voices often misread acronyms and brand words (swallowing the last letter, reading them as words). A dictionary in `brand.json → pronunciations` (shared by a series) or `studio.json → pronunciations` (this project, wins per entry), keyed by language (`vi`, `en`, `default`), rewrites only what is spoken: whole words, case-sensitive, longest match first. Captions keep the written text; editing an entry re-synthesises only the lines that use it.
+- **Speech-to-text check:** with `studio.json → audio.stt.<lang>` pointing at an OpenAI-compatible transcription server, `check-pronunciation.mjs <dir> --allow-stt` compares each sentence with what the server heard: missing or changed words, dictionary entries, acronyms without an entry, and spelled letters that are too short. Report in `review/pronunciation.json`. It only screens; you listen to the flagged lines and decide.
+- **Music & SFX:** offline-synthesised music beds (`ambient`, `lofi`… seamless loops, adjustable BPM/key/length) or your own file; an SFX set (whoosh, pop, ding, riser, impact…) placed per scene in the storyboard. `review/audio-picker.html` (howler.js, local) lets you audition voices, music and SFX side by side. The final mix is always FFmpeg: −14 LUFS, music ducks under the voice.
+- **Looks:** 9 presets (`apple-light`, `apple-keynote`, `neon-terminal`, `synthwave`, `ocean-calm`, `warm-editorial`, `swiss-mono`, `infinity-board`, `default`) plus presets you saved from videos, compared on the same scenes in one contact sheet; macOS-style frosted glass surfaces (`brand.json → surface: "glass"`).
+- **Review stills:** contact sheets hold up to 12 scenes (`review/sheet-1.jpg`, `sheet-2.jpg` … for longer videos). For a moment between the default frames: `keyframe-stills.mjs <dir> s07 --at 12.4,13.6` → `review/sheet-at.jpg`, without changing any approval.
+- **Multiple ratios:** 9:16 / 1:1 keyframes are captured at gate 5. Ratio-specific CSS (`<style data-ratio="9:16">`) re-renders only that ratio.
+- **Engines:** HyperFrames (HTML/GSAP) is the default, including canvas, Lottie and three.js. Remotion is used only for 3D with physics or post-processing. anatomy is exported as static SVG and animated with GSAP. lemo-opuscar renders its own clips.
 
-## Phát triển
+## Development
 
 ```
-npm test                 # node:test, không cần mạng
-npm run test:e2e         # render thật (cần Chrome + FFmpeg)
+npm test                 # node:test, no network
+npm run test:e2e         # real render (needs Chrome + FFmpeg)
 npm run validate:demo    # examples/demo
-npm run validate:gps     # examples/gps-world (mẫu: thế giới liên tục)
+npm run validate:gps     # examples/gps-world (sample: continuous world)
 npm run validate:plugin  # claude plugin validate
 ```
 
-Kế hoạch: `plans/261021-1135-one-studio-skill/`. Báo cáo: `plans/reports/`.
+Plans: `plans/`. Reports: `plans/reports/`.
 
-## Giấy phép
+## License
 
-MIT. Công cụ ngoài giữ giấy phép riêng: HyperFrames, GSAP (miễn phí), Remotion (miễn phí cho cá nhân và công ty ≤ 3 người), anatomy (MIT), lemo-opuscar (MIT, phim CC BY 4.0), Inter (OFL).
+MIT. External tools keep their own licenses: HyperFrames, GSAP (free), Remotion (free for individuals and companies of ≤ 3 people), anatomy (MIT), lemo-opuscar (MIT, film CC BY 4.0), Inter (OFL).
