@@ -19,18 +19,32 @@ Hoặc từ bản clone: `claude plugin marketplace add ./` rồi `claude plugin
 | Chrome Headless Shell | ✓ | `npx hyperframes@0.8.181 browser ensure`, hoặc đặt `HYPERFRAMES_BROWSER_PATH` |
 | yt-dlp | chỉ khi lấy style từ link | `brew install yt-dlp` hoặc `pipx install yt-dlp`; skill không tự cài. File video có sẵn thì không cần |
 | Python 3 | khi dùng file `.lottie` | đọc zip |
-| Server TTS OpenAI-compatible | khi có giọng đọc | ZeroTTS (tiếng Việt, danh sách giọng ở `/v1/audio/voices`), OmniVoice (ngôn ngữ khác) |
+| Server TTS OpenAI-compatible | khi có giọng đọc | ZeroTTS (tiếng Việt, danh sách giọng ở `/v1/audio/voices`), Chatterbox (tiếng Anh, có sẵn trong skill, xem bên dưới), OmniVoice (ngôn ngữ khác) |
 | anatomy skill | scene `explainer` | `npx skills add wheresryan22/anatomy -g -a claude-code` |
 | lemo-opuscar | scene `character` | clone + `npm install`, đặt `ONE_STUDIO_LEMO_LIB` |
 | Remotion | scene 3D có physics/post-fx | `new-remotion.mjs` rồi `npm install` trong `<project>/remotion` |
 
 `node plugins/one-studio/skills/one-studio/scripts/check-external.mjs <project>` cho biết project cần gì và lệnh cài.
 
+### Giọng tiếng Anh: Chatterbox chạy trên máy
+
+Chatterbox (Resemble AI, MIT) là giọng tiếng Anh mặc định của dự án `--lang en`. Skill kèm sẵn một server chuẩn OpenAI ở cổng 8002:
+
+```bash
+bash plugins/one-studio/skills/one-studio/servers/chatterbox/chatterbox-server.sh
+```
+
+- Lần đầu cần `uv` (`brew install uv`). Script tự cài Python 3.11 và torch vào `~/.one-studio/chatterbox/.venv`, rồi tải model khoảng 3 GB.
+- Trên Mac, server chạy bằng CPU, nhanh hơn MPS khoảng 9 lần: mất khoảng 2 giây máy chạy cho mỗi giây giọng đọc. Có GPU NVIDIA thì tự dùng CUDA.
+- Clone giọng: đặt 5–15 giây giọng nói sạch vào `~/.one-studio/chatterbox/voices/<tên>.wav`, rồi chọn giọng `<tên>`. Chỉ clone giọng của bạn hoặc giọng bạn được phép dùng.
+- Chỉnh giọng (khởi động lại server để áp dụng): `CHATTERBOX_EXAGGERATION` chỉnh cảm xúc (mặc định 0.5), `CHATTERBOX_CFG` chỉnh nhịp đọc (mặc định 0.5), `CHATTERBOX_DEVICE` chọn `cpu`, `cuda` hoặc `mps`.
+- Tắt server: `pkill -f chatterbox/server.py`.
+
 ### Biến môi trường
 
 | Biến | Dùng cho |
 |---|---|
-| `ONE_STUDIO_TTS_KEY_VI`, `ONE_STUDIO_TTS_KEY` | API key của ZeroTTS / OmniVoice (không bao giờ ghi vào file) |
+| `ONE_STUDIO_TTS_KEY_VI`, `ONE_STUDIO_TTS_KEY_EN`, `ONE_STUDIO_TTS_KEY` | API key của ZeroTTS / Chatterbox / OmniVoice (không bao giờ ghi vào file) |
 | `HYPERFRAMES_BROWSER_PATH` | Chrome cho HyperFrames |
 | `ONE_STUDIO_LEMO_LIB`, `PLAYWRIGHT_CHROME` | thư viện lemo-opuscar và Chrome của nó |
 | `ONE_STUDIO_ANATOMY` | thư mục anatomy nếu không cài dạng skill |

@@ -13,7 +13,7 @@ Headless renders never capture browser audio, and every clip is normalised with 
 
 ## Voice (gate 0, confirm before the first call)
 - `POST {base_url}/v1/audio/speech` with `{model, input, voice, response_format: "wav", speed}`; any audio format comes back as 48 kHz mono WAV.
-- `studio.json → audio.tts`: `vi` → ZeroTTS, `default` → OmniVoice. Per-line override: `lines[].lang`, `lines[].voice`. Brand voice preset (`brand.json → voice.<lang>`) wins over the endpoint voice, so a series keeps one voice.
+- `studio.json → audio.tts`: `vi` → ZeroTTS, `en` → Chatterbox (port 8002, see below), `default` → OmniVoice. Per-line override: `lines[].lang`, `lines[].voice`. Brand voice preset (`brand.json → voice.<lang>`) wins over the endpoint voice, so a series keeps one voice.
 - `init-project.mjs` writes the placeholder voice `default`, which real servers reject. Pick a real one:
   1. `init-project.mjs D --tts-url http://localhost:8000 --probe-tts` or `tts-openai-compatible.mjs --voices D` → voice ids (ZeroTTS: `GET /v1/audio/voices`; also tries `/v1/voices`, `/voices`). Listing is not synthesis: no consent needed.
   2. Ask: "Nghe thử N giọng (N lần gọi ZeroTTS) nhé?" → `tts-openai-compatible.mjs D --samples all --text "<one line of the script>" --allow-tts` → `review/voices/<id>.wav`.
@@ -21,6 +21,13 @@ Headless renders never capture browser audio, and every clip is normalised with 
 - A rejected voice fails with the server's real list in the message.
 - Keys only from env: `ONE_STUDIO_TTS_KEY_VI`, `ONE_STUDIO_TTS_KEY` (names in `key_env`). Never write a key into a file.
 - Health check: `tts-openai-compatible.mjs --probe D` (one call: models, codec, sample rate, latency).
+
+## Chatterbox (English, bundled server)
+Local, MIT, most natural open English voice we ship; slower than real time is fine for video.
+- Start: `bash "$S/servers/chatterbox/chatterbox-server.sh"` (first run installs Python 3.11 + torch into `~/.one-studio/chatterbox/.venv` via `uv`, then downloads the model, ~3 GB). Uses CUDA when present, else CPU (on Apple Silicon the CPU is ~9x faster than MPS: about 2 s of compute per 1 s of speech). Keep it in its own terminal.
+- Voices: `default` is built in and works as is. Clone a voice: put 5–15 s of clean speech at `~/.one-studio/chatterbox/voices/<name>.wav`; it shows up as voice `<name>` (no restart). Only clone voices the user owns or has permission to use.
+- Tuning (env, restart to apply): `CHATTERBOX_EXAGGERATION` (emotion, 0.5 default; 0.7+ more dramatic), `CHATTERBOX_CFG` (0.5; lower = slower, more deliberate). `speed` is applied with ffmpeg `atempo`.
+- Optional key: set `CHATTERBOX_API_KEY` on the server and `ONE_STUDIO_TTS_KEY_EN` for the scripts.
 
 ## Captions (gate 0 question, re-ask at gate 7)
 Ask once at gate 0, with the user's language:

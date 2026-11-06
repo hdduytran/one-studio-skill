@@ -41,10 +41,14 @@ function slug(text) {
 }
 
 function defaultTts(lang) {
-  // vi → ZeroTTS, everything else → OmniVoice. Both speak OpenAI-compatible /v1/audio/speech.
+  // vi → ZeroTTS, en → Chatterbox (servers/chatterbox), everything else → OmniVoice.
+  // All speak OpenAI-compatible /v1/audio/speech.
   // URLs and voices are placeholders confirmed with the user at gate 0; keys come from env only.
   // The project's own language comes first so it is the entry readers see.
   const omnivoice = { base_url: "http://localhost:8001", model: "omnivoice", voice: "default", format: "wav", key_env: "ONE_STUDIO_TTS_KEY" };
+  // Chatterbox's built-in voice is really called "default", so this one is usable as is.
+  const chatterbox = { base_url: "http://localhost:8002", model: "chatterbox", voice: "default", format: "wav", key_env: "ONE_STUDIO_TTS_KEY_EN" };
+  if (lang?.split("-")[0] === "en") return { en: chatterbox, default: omnivoice };
   if (lang !== "vi") return { default: omnivoice };
   return {
     vi: { base_url: "http://localhost:8000", model: "zerotts", voice: "default", format: "wav", key_env: "ONE_STUDIO_TTS_KEY_VI" },
@@ -177,7 +181,7 @@ async function main() {
   } else if (capMode && capMode !== brandMode) studioCaptions = { enabled: capMode !== "none", mode: capMode };
 
   const tts = sameLang ? prev.audio.tts : defaultTts(language);
-  const ttsKey = tts[language] ? language : "default";
+  const ttsKey = tts[language] ? language : tts[language.split("-")[0]] ? language.split("-")[0] : "default";
   if (args["tts-url"]) tts[ttsKey] = { ...tts[ttsKey], base_url: args["tts-url"] };
   if (args.voice) tts[ttsKey] = { ...tts[ttsKey], voice: args.voice };
   let voices = null;
